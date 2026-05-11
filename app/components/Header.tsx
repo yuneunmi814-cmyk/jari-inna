@@ -24,7 +24,7 @@ export default function Header() {
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
-        <Text style={styles.logo}>🚇 자리있나</Text>
+        <Text style={styles.logo}>🚇 시티드</Text>
         <Pressable
           onPress={() => Alert.alert("설정", "Phase 2에 추가 예정입니다")}
           hitSlop={12}

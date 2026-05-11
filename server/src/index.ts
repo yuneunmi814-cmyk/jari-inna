@@ -1,4 +1,4 @@
-// 자리있나 백엔드 서버 진입점
+// 시티드 백엔드 서버 진입점
 //
 // ⚠️ 중요: ./config/env가 다른 모든 import보다 먼저 와야 한다.
 // 이유: TS/JS의 import는 호이스팅되어 본문 코드보다 먼저 평가된다.
@@ -25,7 +25,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
-    service: "jari-inna-server",
+    service: "seated-server",
     timestamp: new Date().toISOString(),
     apiKeyConfigured: Boolean(process.env.SEOUL_OPEN_API_KEY),
   });
@@ -46,7 +46,7 @@ app.use((_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚇 자리있나 서버 가동: http://localhost:${PORT}`);
+  console.log(`🚇 시티드 서버 가동: http://localhost:${PORT}`);
   console.log(`   헬스체크: http://localhost:${PORT}/health`);
   if (!process.env.SEOUL_OPEN_API_KEY) {
     console.warn(

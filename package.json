@@ -2,7 +2,7 @@
   "name": "jari-inna",
   "version": "0.1.0",
   "private": true,
-  "description": "자리있나(JariInna) - 4호선 칸별 실시간 혼잡도 + 좌석 공유 모바일 앱",
+  "description": "시티드(Seated) - 수도권 지하철 자리 안내 모바일 앱",
   "workspaces": [
     "server",
     "shared",

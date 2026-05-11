@@ -1,4 +1,4 @@
-// 자리있나 앱 진입점
+// 시티드 앱 진입점
 // 구성 순서 (바깥 → 안):
 //   GestureHandlerRootView (swipe gesture 동작에 필요, 최상위)
 //   → SafeAreaProvider (노치/네비바 여백 제공)
