@@ -30,6 +30,7 @@ import Header from "../components/Header";
 import QuickActions from "../components/QuickActions";
 import SectionHeader from "../components/SectionHeader";
 import StationSelector from "../components/StationSelector";
+import SwapButton from "../components/SwapButton";
 import TrainPositionChip from "../components/TrainPositionChip";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
@@ -49,6 +50,7 @@ export default function HomeScreen() {
     direction,
     setDestination,
     setDirection,
+    swapStations,
   } = useStation();
 
   // 도착 정보 — 5초 폴링, pull-to-refresh
@@ -102,6 +104,11 @@ export default function HomeScreen() {
           station={station}
           onPress={() => navigation.navigate("StationPicker", { mode: "departure" })}
         />
+
+        {/* 2.5 출발 ↔ 도착 swap 버튼 row — 도착역 있을 때만 활성 */}
+        <View style={styles.swapRow}>
+          <SwapButton disabled={!destination} onPress={swapStations} />
+        </View>
 
         {/* 3. 어디로 가세요? 카드 */}
         <View style={styles.tripCard}>
@@ -246,9 +253,15 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
 
+  // swap 버튼 row — 출발역 카드와 "어디로 가세요?" 카드 사이 가운데
+  swapRow: {
+    alignItems: "center",
+    marginTop: spacing.sm,
+  },
+
   // "어디로 가세요?" 카드
   tripCard: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
     padding: spacing.lg,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,

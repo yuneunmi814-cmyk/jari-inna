@@ -3,15 +3,17 @@
 //   GestureHandlerRootView (swipe gesture 동작에 필요, 최상위)
 //   → SafeAreaProvider (노치/네비바 여백 제공)
 //   → StatusBar (다크모드 + 배경 일치)
+//   → 1.5초 SplashView (자리잡이 표시) → 끝나면 메인 네비로 전환
 //   → StationProvider / FavoritesProvider (전역 상태)
 //   → NavigationContainer
 //   → RootNavigator (Stack)
 
 import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
+import React, { useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import SplashView from "./components/SplashView";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
 import { StationProvider } from "./contexts/StationContext";
 import { RootNavigator } from "./navigation/RootNavigator";
@@ -37,17 +39,24 @@ const navTheme = {
 };
 
 export default function App() {
+  // 자체 splash 표시 여부 — 1.5초 후 false로 전환되며 메인 앱 노출
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
         <StatusBar style="light" backgroundColor={colors.background} />
-        <StationProvider>
-          <FavoritesProvider>
-            <NavigationContainer theme={navTheme}>
-              <RootNavigator />
-            </NavigationContainer>
-          </FavoritesProvider>
-        </StationProvider>
+        {showSplash ? (
+          <SplashView onDone={() => setShowSplash(false)} />
+        ) : (
+          <StationProvider>
+            <FavoritesProvider>
+              <NavigationContainer theme={navTheme}>
+                <RootNavigator />
+              </NavigationContainer>
+            </FavoritesProvider>
+          </StationProvider>
+        )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

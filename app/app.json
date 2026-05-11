@@ -4,11 +4,11 @@
     "slug": "jari-inna",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icons/jarijabi-icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icons/jarijabi-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F1419"
     },
@@ -17,14 +17,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icons/jarijabi-icon.png",
         "backgroundColor": "#0F1419"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icons/jarijabi-icon.png"
     },
     "plugins": [
       [

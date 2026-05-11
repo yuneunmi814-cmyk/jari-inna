@@ -33,6 +33,9 @@ type StationContextValue = {
   /** 도착역/방면 한꺼번에 리셋 — "다시 고를래요" 같은 경우 */
   resetTrip: () => void;
 
+  /** 출발역 ↔ 도착역 한 번에 swap (도착역 있을 때만 의미) */
+  swapStations: () => void;
+
   /** AsyncStorage 로드 완료 여부 */
   ready: boolean;
 };
@@ -86,6 +89,22 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
     setDirectionState(null);
   };
 
+  /**
+   * 출발역 ↔ 도착역 동시 교환
+   * setStation의 초기화 부작용(도착역/방면 null)을 피하기 위해
+   * 내부 state를 직접 set하고 AsyncStorage만 수동 갱신.
+   * 방면은 새 출발/도착 페어로 자동 재계산되므로 null로 둠.
+   */
+  const swapStations = () => {
+    if (!destination) return; // 도착역 없으면 swap 의미 없음
+    const newDeparture = destination;
+    const newDestination = station;
+    setStationState(newDeparture);
+    setDestinationState(newDestination);
+    setDirectionState(null);
+    AsyncStorage.setItem(STORAGE_KEY, newDeparture).catch(() => {});
+  };
+
   return (
     <StationContext.Provider
       value={{
@@ -96,6 +115,7 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
         direction,
         setDirection,
         resetTrip,
+        swapStations,
         ready,
       }}
     >
