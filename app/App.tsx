@@ -15,13 +15,14 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import SplashView from "./components/SplashView";
 import { FavoritesProvider } from "./contexts/FavoritesContext";
+import { RouteFavoritesProvider } from "./contexts/RouteFavoritesContext";
 import { StationProvider } from "./contexts/StationContext";
 import { RootNavigator } from "./navigation/RootNavigator";
 import { colors } from "./theme/colors";
 
-// React Navigation 다크 테마 (배경색 통일 — 깜빡임 방지)
+// React Navigation 라이트 테마 (배경색 통일 — 깜빡임 방지)
 const navTheme = {
-  dark: true,
+  dark: false,
   colors: {
     primary: colors.accent,
     background: colors.background,
@@ -45,15 +46,17 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={colors.background} />
+        <StatusBar style="dark" backgroundColor={colors.background} />
         {showSplash ? (
           <SplashView onDone={() => setShowSplash(false)} />
         ) : (
           <StationProvider>
             <FavoritesProvider>
-              <NavigationContainer theme={navTheme}>
-                <RootNavigator />
-              </NavigationContainer>
+              <RouteFavoritesProvider>
+                <NavigationContainer theme={navTheme}>
+                  <RootNavigator />
+                </NavigationContainer>
+              </RouteFavoritesProvider>
             </FavoritesProvider>
           </StationProvider>
         )}

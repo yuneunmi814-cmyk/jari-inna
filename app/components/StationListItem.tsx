@@ -99,14 +99,15 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     marginLeft: spacing.sm,
   },
+  // 환승 뱃지 — 4호선 노선 컬러 (호선 표시)
   badge: {
     marginLeft: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
-    backgroundColor: colors.primary + "30",
+    backgroundColor: colors.line4 + "20",
   },
-  badgeText: { ...typography.micro, color: colors.accent },
+  badgeText: { ...typography.micro, color: colors.line4, fontWeight: "600" },
   currentDot: { color: colors.accent, marginHorizontal: spacing.sm, fontSize: 16 },
   currentLabel: { ...typography.caption, color: colors.accent, fontWeight: "600" },
   starBtn: {

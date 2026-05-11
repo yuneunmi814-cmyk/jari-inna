@@ -4,6 +4,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 
@@ -40,6 +41,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   inner: {
     flexDirection: "row",

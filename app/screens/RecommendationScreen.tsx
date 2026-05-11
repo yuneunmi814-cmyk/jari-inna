@@ -35,6 +35,7 @@ import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 import {
@@ -246,7 +247,7 @@ export default function RecommendationScreen() {
             pressed && { opacity: 0.8 },
             alreadyFav && styles.favBtnDone,
           ]}
-          android_ripple={{ color: "#FFFFFF20", borderless: false }}
+          android_ripple={{ color: colors.ripplePrimary, borderless: false }}
         >
           <Text style={styles.favIcon}>{alreadyFav ? "✓" : "⭐"}</Text>
           <Text style={styles.favText}>
@@ -337,6 +338,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   recoHeader: {
     flexDirection: "row",
@@ -420,14 +422,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  // "환승역" 뱃지 — 4호선 노선 컬러
   tripStatBadge: {
     ...typography.caption,
-    color: colors.accent,
+    color: colors.line4,
     fontWeight: "700",
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.sm,
-    backgroundColor: colors.primary + "30",
+    backgroundColor: colors.line4 + "20",
   },
   tripDivider: {
     width: 1,

@@ -1,85 +1,76 @@
-// 즐겨찾기 화면 (Phase 1)
+// 경로 즐겨찾기 화면 (도쿄메트로 my! 패턴)
 //
 // 구성:
-//   1) 헤더: ← 뒤로 + "즐겨찾기"
-//   2) 상단 CTA: "현재 출발역(○○)을 즐겨찾기에 추가" — 이미 추가된 역이면 비활성
-//   3) 즐겨찾기 리스트 (최신순):
-//      - 좌측: 역명 + 추가 시각
-//      - 우측: ⓧ 삭제 버튼
-//   4) 비어있을 때: 일러스트 + 안내 카피
+//   1) 헤더: ← 뒤로 + "⭐ 즐겨찾기"
+//   2) 비어있으면 EmptyState + "+ 새 즐겨찾기 추가"
+//   3) FavoriteRouteCard 리스트 (최신순)
+//   4) 하단 floating "+ 새 즐겨찾기 추가" 버튼
 //
-// ⚠️ 스와이프 삭제는 Phase 1 이후. gesture-handler 통합 시간 부족.
-//    당분간 명시적 삭제 버튼 사용 — 안드로이드 머티리얼 가이드라인에도 부합.
+// 추가 흐름:
+//   사용자가 HomeScreen에서 출발/도착 둘 다 고른 상태일 때만 새 추가 가능.
+//   둘 중 하나라도 없으면 Alert로 안내 + HomeScreen으로 이동.
+//
+// 카드 탭 → setTrip(departure, destination) + navigation.navigate("Home")
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React from "react";
-import {
-  Alert,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AddFavoriteModal from "../components/AddFavoriteModal";
 import EmptyState from "../components/EmptyState";
-import { useFavorites } from "../contexts/FavoritesContext";
+import FavoriteRouteCard from "../components/FavoriteRouteCard";
+import { useRouteFavorites } from "../contexts/RouteFavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import { confirmAlert } from "../utils/confirmDialog";
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Favorites">;
 
-/**
- * 추가 시각을 "방금 추가" / "N분 전" / "오늘 HH:MM" / "MM/DD" 형태로
- */
-function formatAddedAt(ts: number): string {
-  const now = Date.now();
-  const diffMin = Math.floor((now - ts) / 60000);
-  if (diffMin < 1) return "방금 추가";
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const d = new Date(ts);
-  const today = new Date();
-  if (
-    d.getFullYear() === today.getFullYear() &&
-    d.getMonth() === today.getMonth() &&
-    d.getDate() === today.getDate()
-  ) {
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `오늘 ${hh}:${mm}`;
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
 export default function FavoritesScreen() {
   const navigation = useNavigation<NavProp>();
-  const { station: currentStation } = useStation();
-  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const { station, destination, setTrip } = useStation();
+  const { routes, addRoute, removeRoute } = useRouteFavorites();
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const alreadyAdded = isFavorite(currentStation);
-
-  const handleAddCurrent = () => {
-    if (alreadyAdded) return;
-    addFavorite(currentStation);
+  /** 카드 탭 → 출발/도착 적용 + 홈으로 */
+  const handleUseRoute = (departure: string, dest: string) => {
+    setTrip(departure, dest);
+    navigation.navigate("Home");
   };
 
-  const handleRemove = (id: string, name: string) => {
-    Alert.alert(
-      "즐겨찾기에서 빼기",
-      `'${name}'을(를) 즐겨찾기에서 빼시겠어요?`,
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "빼기",
-          style: "destructive",
-          onPress: () => removeFavorite(id),
-        },
-      ]
-    );
+  /**
+   * 카드 삭제 — 크로스 플랫폼 확인 다이얼로그
+   * web: window.confirm, native: Alert.alert
+   */
+  const handleDelete = (id: string, label: string) => {
+    confirmAlert({
+      title: "즐겨찾기 삭제",
+      message: `'${label}'을(를) 즐겨찾기에서 빼시겠어요?`,
+      confirmText: "삭제",
+      cancelText: "취소",
+      destructive: true,
+      onConfirm: () => removeRoute(id),
+    });
+  };
+
+  /** + 새 즐겨찾기 추가 버튼 — 도착역 없으면 안내 후 홈으로 */
+  const handleAddPress = () => {
+    if (!destination) {
+      confirmAlert({
+        title: "도착역을 먼저 골라주세요",
+        message: "홈에서 출발역/도착역을 정하면 이 경로를 즐겨찾기에 추가할 수 있어요.",
+        confirmText: "홈으로 가기",
+        cancelText: "취소",
+        onConfirm: () => navigation.navigate("Home"),
+      });
+      return;
+    }
+    setModalVisible(true);
   };
 
   return (
@@ -93,63 +84,58 @@ export default function FavoritesScreen() {
         >
           <Text style={styles.backText}>←</Text>
         </Pressable>
-        <Text style={styles.title}>즐겨찾기</Text>
+        <Text style={styles.title}>⭐ 즐겨찾기</Text>
         <View style={styles.headerRight} />
       </View>
 
-      {/* 현재 출발역 추가 CTA */}
-      <View style={styles.ctaWrap}>
-        <Pressable
-          onPress={handleAddCurrent}
-          disabled={alreadyAdded}
-          style={({ pressed }) => [
-            styles.cta,
-            alreadyAdded && styles.ctaDisabled,
-            pressed && !alreadyAdded && { backgroundColor: colors.surfaceElevated },
-          ]}
-          android_ripple={
-            alreadyAdded ? undefined : { color: colors.surfaceElevated, borderless: false }
-          }
-        >
-          <Text style={styles.ctaIcon}>{alreadyAdded ? "✓" : "⭐"}</Text>
-          <Text style={[styles.ctaText, alreadyAdded && { color: colors.textSecondary }]}>
-            {alreadyAdded
-              ? `'${currentStation}'은(는) 이미 추가됨`
-              : `현재 출발역 '${currentStation}' 추가하기`}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* 리스트 */}
-      {favorites.length === 0 ? (
-        <EmptyState
-          emoji="⭐"
-          title="아직 즐겨찾기가 없어요"
-          description="자주 가는 역을 추가해두면 빠르게 갈 수 있어요"
-        />
+      {/* 리스트 / 빈 상태 */}
+      {routes.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            emoji="⭐"
+            title="아직 즐겨찾기가 없어요"
+            description="자주 가는 경로를 등록해두면 한 번에 불러올 수 있어요"
+          />
+        </View>
       ) : (
         <FlatList
-          data={favorites}
+          data={routes}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardLeft}>
-                <Text style={styles.stationName}>{item.stationName}</Text>
-                <Text style={styles.addedAt}>{formatAddedAt(item.addedAt)}</Text>
-              </View>
-              <Pressable
-                onPress={() => handleRemove(item.id, item.stationName)}
-                hitSlop={12}
-                style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.5 }]}
-              >
-                <Text style={styles.removeIcon}>✕</Text>
-              </Pressable>
-            </View>
+            <FavoriteRouteCard
+              route={item}
+              onUse={() => handleUseRoute(item.departure, item.destination)}
+              onDelete={() => handleDelete(item.id, item.label)}
+            />
           )}
         />
       )}
+
+      {/* 하단 floating 추가 버튼 */}
+      <View style={styles.addWrap}>
+        <Pressable
+          onPress={handleAddPress}
+          style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+          android_ripple={{ color: colors.ripplePrimary }}
+        >
+          <Text style={styles.addIcon}>+</Text>
+          <Text style={styles.addText}>새 즐겨찾기 추가</Text>
+        </Pressable>
+      </View>
+
+      {/* 추가 모달 — 출발/도착은 현재 Context 값으로 prefill */}
+      <AddFavoriteModal
+        visible={modalVisible}
+        departure={station}
+        destination={destination ?? ""}
+        onCancel={() => setModalVisible(false)}
+        onSubmit={async (input) => {
+          await addRoute(input);
+          setModalVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -172,39 +158,38 @@ const styles = StyleSheet.create({
   },
   headerRight: { width: 40 },
 
-  ctaWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md },
-  cta: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+  emptyWrap: { flex: 1, justifyContent: "center" },
+  list: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: 100, // 하단 floating 버튼 여유
   },
-  ctaDisabled: { opacity: 0.6 },
-  ctaIcon: { fontSize: 20, marginRight: spacing.md },
-  ctaText: { ...typography.bodyLg, color: colors.textPrimary, flex: 1 },
-
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   separator: { height: spacing.sm },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+
+  addWrap: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.xl,
   },
-  cardLeft: { flex: 1 },
-  stationName: { ...typography.h3, color: colors.textPrimary, fontSize: 18 },
-  addedAt: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  removeBtn: {
-    width: 32,
-    height: 32,
+  addBtn: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg,
+    gap: spacing.sm,
+    ...shadows.elevated,
   },
-  removeIcon: { fontSize: 18, color: colors.textSecondary },
+  addIcon: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    lineHeight: 22,
+  },
+  addText: {
+    ...typography.button,
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
 });

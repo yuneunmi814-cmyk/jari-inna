@@ -11,7 +11,7 @@
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -22,21 +22,25 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AddFavoriteModal from "../components/AddFavoriteModal";
 import ArrivalCard from "../components/ArrivalCard";
 import DestinationSelector from "../components/DestinationSelector";
 import DirectionToggle from "../components/DirectionToggle";
 import EmptyState from "../components/EmptyState";
 import Header from "../components/Header";
 import QuickActions from "../components/QuickActions";
+import QuickStartSection from "../components/QuickStartSection";
 import SectionHeader from "../components/SectionHeader";
 import StationSelector from "../components/StationSelector";
 import SwapButton from "../components/SwapButton";
 import TrainPositionChip from "../components/TrainPositionChip";
+import { useRouteFavorites } from "../contexts/RouteFavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
 import { usePositions } from "../hooks/usePositions";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 
@@ -51,7 +55,14 @@ export default function HomeScreen() {
     setDestination,
     setDirection,
     swapStations,
+    setTrip,
   } = useStation();
+  const { routes: favRoutes, addRoute, hasRoute } = useRouteFavorites();
+
+  // 즐겨찾기 추가 모달 표시 여부 — 출발/도착 둘 다 있을 때만 활성
+  const [favModalVisible, setFavModalVisible] = useState(false);
+  const canFavorite = Boolean(destination);
+  const alreadyFavorited = canFavorite ? hasRoute(station, destination!) : false;
 
   // 도착 정보 — 5초 폴링, pull-to-refresh
   const arrivals = useArrivals(station);
@@ -99,6 +110,13 @@ export default function HomeScreen() {
         {/* 1. 헤더 */}
         <Header />
 
+        {/* 1.5 ⚡ 빠른 출발 — 즐겨찾기 1탭 사용 */}
+        <QuickStartSection
+          routes={favRoutes}
+          onUseRoute={(r) => setTrip(r.departure, r.destination)}
+          onAddNew={() => navigation.navigate("Favorites")}
+        />
+
         {/* 2. 출발역 카드 */}
         <StationSelector
           station={station}
@@ -137,28 +155,48 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* 4. 추천 받기 버튼 */}
-        <Pressable
-          onPress={handleRecommend}
-          disabled={!canRecommend}
-          style={({ pressed }) => [
-            styles.recommendBtn,
-            !canRecommend && styles.recommendBtnDisabled,
-            pressed && canRecommend && { opacity: 0.85 },
-          ]}
-          android_ripple={
-            canRecommend ? { color: "#FFFFFF20", borderless: false } : undefined
-          }
-        >
-          <Text
-            style={[
-              styles.recommendText,
-              !canRecommend && { color: colors.textTertiary },
+        {/* 4. 액션 버튼 row — 추천 받기 (메인) + ⭐ 즐겨찾기 추가 (보조) */}
+        <View style={styles.actionRow}>
+          <Pressable
+            onPress={handleRecommend}
+            disabled={!canRecommend}
+            style={({ pressed }) => [
+              styles.recommendBtn,
+              !canRecommend && styles.recommendBtnDisabled,
+              pressed && canRecommend && { opacity: 0.85 },
             ]}
+            android_ripple={
+              canRecommend ? { color: colors.ripplePrimary, borderless: false } : undefined
+            }
           >
-            {canRecommend ? "추천 받기" : "방면이나 도착역을 골라주세요"}
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.recommendText,
+                !canRecommend && { color: colors.textTertiary },
+              ]}
+            >
+              {canRecommend ? "추천 받기" : "방면이나 도착역을 골라주세요"}
+            </Text>
+          </Pressable>
+
+          {/* 즐겨찾기 추가 — 도착역 있을 때만 활성, 이미 추가됨이면 표시만 */}
+          <Pressable
+            onPress={() => setFavModalVisible(true)}
+            disabled={!canFavorite || alreadyFavorited}
+            style={({ pressed }) => [
+              styles.favBtn,
+              (!canFavorite || alreadyFavorited) && styles.favBtnDisabled,
+              pressed && canFavorite && !alreadyFavorited && { opacity: 0.7 },
+            ]}
+            accessibilityLabel={
+              alreadyFavorited
+                ? "이미 즐겨찾기에 있음"
+                : "이 경로 즐겨찾기에 추가"
+            }
+          >
+            <Text style={styles.favBtnIcon}>{alreadyFavorited ? "✓" : "⭐"}</Text>
+          </Pressable>
+        </View>
 
         {/* 5. 다음 열차 */}
         <SectionHeader title="다음 열차" />
@@ -176,6 +214,18 @@ export default function HomeScreen() {
 
         <View style={styles.footerSpacer} />
       </ScrollView>
+
+      {/* 경로 즐겨찾기 추가 모달 — 출발/도착 prefill */}
+      <AddFavoriteModal
+        visible={favModalVisible}
+        departure={station}
+        destination={destination ?? ""}
+        onCancel={() => setFavModalVisible(false)}
+        onSubmit={async (input) => {
+          await addRoute(input);
+          setFavModalVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -267,6 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   tripLabel: {
     ...typography.caption,
@@ -285,13 +336,20 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
   },
 
-  // 추천 받기 버튼
-  recommendBtn: {
+  // 액션 row (추천 받기 + 즐겨찾기)
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
     marginTop: spacing.lg,
+  },
+  // 추천 받기 — 메인 (flex 1)
+  recommendBtn: {
+    flex: 1,
     paddingVertical: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.primary,
     alignItems: "center",
+    justifyContent: "center",
   },
   recommendBtnDisabled: {
     backgroundColor: colors.surface,
@@ -303,6 +361,23 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "700",
+  },
+  // 즐겨찾기 추가 — 보조 정사각 버튼
+  favBtn: {
+    width: 56,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.warning,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  favBtnDisabled: {
+    borderColor: colors.border,
+    opacity: 0.5,
+  },
+  favBtnIcon: {
+    fontSize: 22,
   },
 
   loadingBox: { alignItems: "center", paddingVertical: spacing.xl },

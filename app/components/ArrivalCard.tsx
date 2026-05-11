@@ -5,6 +5,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { StationArrival } from "../../shared/types/metro";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
 
@@ -109,6 +110,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   leftBlock: {
     width: 108, // "4정거장 전" 같은 fallback도 안 잘리게 약간 넓힘
@@ -139,15 +141,17 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
     flexShrink: 1,
   },
+  // 상행/하행 뱃지 — 4호선 노선 컬러로 표시 (호선 라벨)
   directionBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
-    backgroundColor: colors.primary + "30", // 20% 투명도
+    backgroundColor: colors.line4 + "20", // 4호선 블루 12.5% alpha
   },
   directionText: {
     ...typography.micro,
-    color: colors.accent,
+    color: colors.line4,
+    fontWeight: "600",
   },
   position: {
     ...typography.caption,

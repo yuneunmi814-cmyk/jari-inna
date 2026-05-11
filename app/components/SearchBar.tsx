@@ -34,7 +34,7 @@ export default function SearchBar({
         autoCapitalize="none"
         returnKeyType="search"
         // 안드로이드에서 다크 키보드 가이드라인
-        keyboardAppearance="dark"
+        keyboardAppearance="light"
       />
       {value.length > 0 && (
         <Pressable

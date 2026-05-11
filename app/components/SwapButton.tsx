@@ -9,6 +9,7 @@
 import React, { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text } from "react-native";
 import { colors } from "../theme/colors";
+import { shadows } from "../theme/shadows";
 import { radius } from "../theme/spacing";
 import { typography } from "../theme/typography";
 
@@ -74,6 +75,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    ...shadows.elevated,
   },
   btnDisabled: {
     opacity: 0.35,
