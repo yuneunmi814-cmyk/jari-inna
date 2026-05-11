@@ -82,3 +82,60 @@ export const LINE_4_STATIONS: StationInfo[] = [
  * 가나다 인덱스용 자모 순서
  */
 export const CHOSUNG_ORDER = ["ㄱ", "ㄴ", "ㄷ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅍ", "ㅎ"];
+
+// ─────────────────────────────────────────────────────────────────────
+// 운행 순서 / 종착역 / 방면 계산을 위한 헬퍼
+//
+// 4호선 운행 순서는 LINE_4_STATIONS 배열 index 그대로 사용:
+//   당고개(0) ←──상행──── ... ────하행──→ 오이도(46)
+//
+// 방면(direction) 표현:
+//   - "당고개행" = 상행 (배열 index 감소 방향)
+//   - "오이도행" = 하행 (배열 index 증가 방향)
+//
+// ⚠️ Phase 1 단순화: 실제 4호선엔 사당/안산/한대앞 등 단축 운행 종착역이 있지만,
+//   Phase 1에선 양 끝 두 종착역(당고개/오이도)만 표시. 추후 실제 운행 데이터 들어오면 정교화.
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 4호선 종착역 (양 끝 — Phase 1 기준)
+ */
+export const TERMINUS_UP = "당고개";   // 상행 종착 (index 0)
+export const TERMINUS_DOWN = "오이도";  // 하행 종착 (index 46)
+
+/**
+ * 사용자 친화적 종착역 목록 — Phase 2에서 단축 운행(사당/안산/한대앞) 추가 예정
+ */
+export const ALL_TERMINI = [TERMINUS_UP, TERMINUS_DOWN] as const;
+
+/**
+ * 역 이름으로 운행 순서(index) 조회
+ * 못 찾으면 -1 반환
+ */
+export function getStationOrder(name: string): number {
+  return LINE_4_STATIONS.findIndex((s) => s.name === name);
+}
+
+/**
+ * 역 이름으로 StationInfo 조회
+ */
+export function getStationByName(name: string): StationInfo | undefined {
+  return LINE_4_STATIONS.find((s) => s.name === name);
+}
+
+/**
+ * 특정 역에서 갈 수 있는 종착역 두 곳을 반환
+ * 어디서든 양 끝 종착역까지 갈 수 있다고 가정 (Phase 1)
+ * @returns { up: "당고개", down: "오이도" } 또는 본인이 종착역이면 한 쪽만
+ */
+export function getReachableTermini(fromStation: string): {
+  up?: string;
+  down?: string;
+} {
+  const order = getStationOrder(fromStation);
+  if (order < 0) return {};
+  return {
+    up: order > 0 ? TERMINUS_UP : undefined,
+    down: order < LINE_4_STATIONS.length - 1 ? TERMINUS_DOWN : undefined,
+  };
+}

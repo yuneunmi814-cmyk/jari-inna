@@ -9,6 +9,7 @@ import "./config/env";
 import express from "express";
 import cors from "cors";
 import metroRouter from "./routes/metro";
+import debugRouter from "./routes/debug";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -32,6 +33,9 @@ app.get("/health", (_req, res) => {
 
 // 지하철 API 라우트
 app.use("/api/metro", metroRouter);
+
+// 디버그 라우트 (개발 단계 전용) — Phase 통합 끝나면 제거 예정
+app.use("/debug", debugRouter);
 
 // 404 핸들러
 app.use((_req, res) => {

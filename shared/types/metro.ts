@@ -76,13 +76,83 @@ export interface CarCongestion {
 
 /**
  * 백엔드 → 앱 응답 표준 포맷
+ * source 필드: 원본 데이터 출처 표시 (Phase 2부터 추가)
  */
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
+  source?: DataSource;
   error?: {
     code: string;
     message: string;
   };
   timestamp: string;
+}
+
+/**
+ * 데이터 출처 식별자
+ * - seoul: 서울 열린데이터광장 (서울교통공사 관할 구간)
+ * - data_go_kr: 공공데이터포털 한국철도공사 API (안산선/과천선 구간)
+ * - merged: 두 출처 데이터를 합쳐서 사용
+ */
+export type DataSource = "seoul" | "data_go_kr" | "merged";
+
+/**
+ * 공공데이터포털 한국철도공사 열차운행정보 API 타입
+ * Base URL: http://apis.data.go.kr/B551457/run/v2
+ *
+ * 원본 응답 구조는 공공데이터포털 표준을 따른다:
+ *   response.header (resultCode/resultMsg) + response.body.items.item[]
+ *
+ * ⚠️ 정확한 필드 이름은 실제 API 호출 후 보강 예정.
+ * 현재 정의는 공공데이터포털 메타데이터 문서 기반 추정.
+ */
+export namespace DataGoKr {
+  /** 표준 응답 헤더 */
+  export interface ResponseHeader {
+    resultCode: string; // "00" = 정상, 그 외는 에러
+    resultMsg: string;
+  }
+
+  /**
+   * 운행정보/운행계획 1건 (raw)
+   * - 실제 호출 후 필드명 확정 전까지 모든 값 optional + 임의 키 허용
+   */
+  export interface RawTrainItem {
+    runDt?: string;        // 운행일자 YYYYMMDD
+    trnNo?: string;        // 열차번호
+    trnRunSn?: string;     // 열차운행일련번호 (운행정보 only)
+    stCd?: string;         // 역코드
+    stNm?: string;         // 역명
+    mlnCd?: string;        // 주운행선코드
+    mlnNm?: string;        // 주운행선명
+    updnCd?: string;       // 상행/하행구분 (0=상행, 1=하행 추정)
+    stnCntyCd?: string;    // 정차구분코드
+    stnCntyNm?: string;    // 정차구분명 (예: "정차역")
+    trnDprtDt?: string;    // 열차출발일시
+    trnArrvDt?: string;    // 열차도착일시
+    dptStCd?: string;      // 출발역코드 (운행계획)
+    dptStNm?: string;      // 출발역명
+    arvStCd?: string;      // 도착역코드 (운행계획)
+    arvStNm?: string;      // 도착역명
+    [key: string]: unknown; // 안전망: 미확정 필드도 받아들임
+  }
+
+  /**
+   * items가 비어있을 때 서버가 빈 문자열/객체를 반환할 수 있어 union으로 정의
+   */
+  export type RawItems = { item: RawTrainItem[] | RawTrainItem } | "" | null;
+
+  /** 전체 응답 envelope */
+  export interface Response {
+    response: {
+      header: ResponseHeader;
+      body: {
+        items: RawItems;
+        numOfRows: number;
+        pageNo: number;
+        totalCount: number;
+      };
+    };
+  }
 }

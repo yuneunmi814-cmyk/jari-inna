@@ -13,26 +13,41 @@ interface Props {
 }
 
 /**
- * 도착까지 남은 시간을 사람이 읽기 좋게 변환
- * 우선순위: arvlCd(상태) > barvlDt(초)
+ * 도착까지 남은 시간을 짧고 명확하게 변환
+ * 우선순위: arvlCd(상태) > barvlDt(초) > arvlMsg2(서울 API 텍스트, 가공)
+ *
+ * 좌측 박스 폭에 들어가는 짧은 텍스트 보장:
+ *   - "도착" / "곧 도착" / "N분"
+ *   - "[4]번째 전역 (창동)" → "4정거장 전" (긴 원문 가공)
  */
 function formatTime(arrival: StationArrival): { main: string; emphasis: boolean } {
-  // arvlCd가 1(도착) / 0(진입)이면 메시지 우선
+  // 1. 명시적 상태가 가장 정확
   if (arrival.arvlCd === "1") return { main: "도착", emphasis: true };
   if (arrival.arvlCd === "0") return { main: "곧 도착", emphasis: true };
 
-  // barvlDt가 숫자 초 단위로 들어오는 경우
+  // 2. barvlDt 초 단위
   const secs = Number(arrival.barvlDt);
   if (Number.isFinite(secs) && secs > 0) {
     const min = Math.floor(secs / 60);
-    const remain = secs % 60;
-    if (min === 0) return { main: `${remain}초`, emphasis: true };
-    if (remain === 0) return { main: `${min}분`, emphasis: false };
-    return { main: `${min}분 ${remain}초`, emphasis: false };
+    if (min === 0) return { main: `${secs}초`, emphasis: true };
+    return { main: `${min}분`, emphasis: false }; // 초는 잘라서 짧게
   }
 
-  // fallback: 서울 API arvlMsg2 그대로 (예: "[2]번째 전역 (선바위)")
-  return { main: arrival.arvlMsg2 || "-", emphasis: false };
+  // 3. arvlMsg2 가공
+  const msg = (arrival.arvlMsg2 ?? "").trim();
+
+  // "[4]번째 전역 (창동)" / "[N]번째 전역" → "N정거장 전"
+  const m = msg.match(/^\[(\d+)\]번째 전역/);
+  if (m) return { main: `${m[1]}정거장 전`, emphasis: false };
+
+  // "전역 출발" / "전역 진입" / "전역 도착" — 그대로 (짧음)
+  if (msg.startsWith("전역")) return { main: msg, emphasis: false };
+
+  // "이번역 도착" / "○○ 도착" 같이 짧은 텍스트
+  if (msg.length <= 6) return { main: msg, emphasis: false };
+
+  // 그 외 긴 텍스트는 "-"로 단순화 (정보 손실 < 잘림 보기 흉함)
+  return { main: "-", emphasis: false };
 }
 
 /**
@@ -96,15 +111,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   leftBlock: {
-    width: 96,
+    width: 108, // "4정거장 전" 같은 fallback도 안 잘리게 약간 넓힘
     paddingRight: spacing.md,
     borderRightWidth: 1,
     borderRightColor: colors.border,
+    justifyContent: "center",
   },
   time: {
     ...typography.display,
     color: colors.textPrimary,
-    fontSize: 24,
+    fontSize: 22, // 24 → 22로 살짝 줄여 안전 마진 확보
   },
   rightBlock: {
     flex: 1,

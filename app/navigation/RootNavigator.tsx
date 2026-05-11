@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import FavoritesScreen from "../screens/FavoritesScreen";
 import HomeScreen from "../screens/HomeScreen";
+import RecommendationScreen from "../screens/RecommendationScreen";
 import StationPickerScreen from "../screens/StationPickerScreen";
 import { colors } from "../theme/colors";
 import type { RootStackParamList } from "./types";
@@ -24,6 +25,7 @@ export function RootNavigator() {
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="StationPicker" component={StationPickerScreen} />
       <Stack.Screen name="Favorites" component={FavoritesScreen} />
+      <Stack.Screen name="Recommendation" component={RecommendationScreen} />
     </Stack.Navigator>
   );
 }
