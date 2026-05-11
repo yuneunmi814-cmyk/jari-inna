@@ -55,7 +55,7 @@ export interface StationArrival {
   arvlCd: ArrivalCode;      // 도착 코드
   barvlDt: string;          // 도착 예정 시간 (초)
   recptnDt: string;         // 수신 시각
-  updnLine: "0" | "1";      // 0: 상행, 1: 하행
+  updnLine: "상행" | "하행"; // 서울 API는 한글로 반환
 }
 
 /**
