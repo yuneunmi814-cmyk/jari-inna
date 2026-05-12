@@ -399,20 +399,54 @@ function line2BranchLabel(b: Line2Branch): string {
 }
 
 /**
- * 두 호선이 만나는 환승역 찾기.
- * TRANSFER_STATIONS lookup — 첫 매치 반환.
- * (여러 환승역 가능: 4↔2는 사당/동대문역사문화공원/서울역 — Phase B에서 경로상 최적화)
+ * 두 호선이 만나는 환승역 후보 모두 찾기.
+ * (예: 4↔2 = 사당, 동대문역사문화공원, 서울역, 충무로 등)
  */
-function findInterchangeStation(
-  fromLine: LineKey,
-  toLine: LineKey
-): string | null {
+function findAllInterchanges(fromLine: LineKey, toLine: LineKey): string[] {
+  const out: string[] = [];
   for (const [station, lines] of Object.entries(TRANSFER_STATIONS)) {
     if (lines.includes(fromLine) && lines.includes(toLine)) {
-      return station;
+      out.push(station);
     }
   }
-  return null;
+  return out;
+}
+
+/**
+ * 최적 환승역 — 출발+도착 총 정거장 수 최소 기준.
+ *
+ * 예) 노원(4) → 강남(2):
+ *   - 동대문역사문화공원: 4호선 12개 + 2호선 20개 = 32 (지하 두번 갈아탐)
+ *   - 사당: 4호선 16개 + 2호선 3개 = 19  ← 선택
+ *   - 서울역: 4호선 11개 + 2호선 ?? = 비효율
+ *
+ * 가나다 첫 매치(동대문역사문화공원) 대신 실제 경로상 가까운 곳 우선.
+ */
+function findBestInterchange(
+  fromStation: string,
+  fromLine: LineKey,
+  toStation: string,
+  toLine: LineKey
+): string | null {
+  const candidates = findAllInterchanges(fromLine, toLine);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  let best: string | null = null;
+  let minTotal = Number.POSITIVE_INFINITY;
+  for (const station of candidates) {
+    const d1 = countStops(fromStation, station, fromLine);
+    const d2 = countStops(station, toStation, toLine);
+    // 두 거리 모두 계산 가능한 경우만 (계산 불가 시 0 반환 → 신뢰 X)
+    if (d1 <= 0 || d2 <= 0) continue;
+    const total = d1 + d2;
+    if (total < minTotal) {
+      minTotal = total;
+      best = station;
+    }
+  }
+  // 모든 후보 거리 계산 실패면 첫 매치라도 반환 (fallback)
+  return best ?? candidates[0];
 }
 
 /**
@@ -429,14 +463,18 @@ export function findTransfer(
   toStation: string,
   toLine: LineKey
 ): TransferInfo | null {
-  // 1. 호선이 다르면 환승 필요
+  // 1. 호선이 다르면 환승 필요 — 최단 경로 환승역 선택
   if (fromLine !== toLine) {
-    const at = findInterchangeStation(fromLine, toLine);
+    const at = findBestInterchange(fromStation, fromLine, toStation, toLine);
     if (!at) {
       // 두 호선이 직접 만나는 환승역 없음 (이론상 가능, 실무 거의 없음)
-      // console.log("[findTransfer] no direct interchange:", fromLine, toLine);
       return null;
     }
+    console.log(
+      "[findTransfer] 최적 환승역:",
+      at,
+      `(${fromStation} ${fromLine}호선 → ${toStation} ${toLine}호선)`
+    );
     return {
       at,
       fromLineLabel: LINES[fromLine].name,
