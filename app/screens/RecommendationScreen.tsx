@@ -121,8 +121,12 @@ export default function RecommendationScreen() {
     navigation.goBack();
   };
 
-  // 도착 정보 — 5초 폴링
-  const arrivals = useArrivals(station);
+  // 도착 정보 — 5초 폴링.
+  // 강남(1002+1077 신분당 섞임), 노원(1004+1007) 같은 환승역에서
+  // 사용자가 고른 출발 호선만 받기 위해 lineCode (1000+N) 전달.
+  // 매핑: '2' → 1002, '4' → 1004 ...
+  const departureLineCode = 1000 + Number(departureLine);
+  const arrivals = useArrivals(station, departureLineCode);
 
   // ─────────────────────────────────────────────────────────────
   // Pull-to-Refresh — 혼잡도 + 도착정보 동시 재조회
@@ -156,6 +160,10 @@ export default function RecommendationScreen() {
   //   - 2호선 순환선: "내선"/"외선"
   // direction 값 매핑:
   //   "up" → "상행", "down" → "하행", "inner" → "내선", "outer" → "외선"
+  //
+  // 매칭 안전망:
+  //   updnLine 이 비거나 누락 시 trainLineNm 의 "외선/내선/상행/하행" 키워드로 fallback.
+  //   (강남역 실측 응답은 updnLine "외선"/"내선" 정확히 옴 → fallback 거의 안 탐)
   const filteredArrivals = useMemo(() => {
     if (!dirResult) return arrivals.data;
     const targetUpdn =
@@ -164,8 +172,22 @@ export default function RecommendationScreen() {
       dirResult.direction === "inner" ? "내선" :
       dirResult.direction === "outer" ? "외선" :
       "";
-    return arrivals.data.filter((a) => a.updnLine === targetUpdn);
-  }, [arrivals.data, dirResult]);
+    const matched = arrivals.data.filter(
+      (a) =>
+        a.updnLine === targetUpdn ||
+        (!a.updnLine && a.trainLineNm?.includes(targetUpdn))
+    );
+    // 디버그 로그 — 데이터가 있는데 매칭이 0이면 진단용 출력
+    if (arrivals.data.length > 0) {
+      console.log(
+        `[Arrival] 매칭 로직: line=${departureLine}, direction=${dirResult.label}`
+      );
+      console.log(
+        `[Arrival] 매칭됨: ${dirResult.label} ${matched.length}대 (전체 ${arrivals.data.length}대 중)`
+      );
+    }
+    return matched;
+  }, [arrivals.data, dirResult, departureLine]);
 
   // 도착역 환승역 여부
   const destInfo = destination ? getStationByName(destination) : undefined;

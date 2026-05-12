@@ -174,12 +174,26 @@ export async function getRealtimeArrival(
 }
 
 /**
- * 4호선 전용 필터 유틸
+ * 호선별 필터 유틸 — 1001~1009 모두 지원
+ *
+ * 서울 API 응답에서 다른 호선/타 사업자(신분당선 1077 등)를 걸러낸다.
+ * 강남역 호출 시 1002(2호선)+1077(신분당) 섞여 오므로,
+ * 사용자가 출발 호선으로 고른 호선만 골라낸다.
  */
-export function filterLine4<T extends { subwayId?: LineCode; lineCode?: LineCode }>(
-  items: T[]
-): T[] {
+export function filterByLineCode<
+  T extends { subwayId?: LineCode | number; lineCode?: LineCode | number }
+>(items: T[], lineCode: LineCode): T[] {
   return items.filter(
-    (item) => item.subwayId === LINE_4 || item.lineCode === LINE_4
+    (item) =>
+      Number(item.subwayId) === lineCode || Number(item.lineCode) === lineCode
   );
+}
+
+/**
+ * 4호선 전용 필터 — 기존 호출처 호환용 (filterByLineCode 를 호출)
+ */
+export function filterLine4<
+  T extends { subwayId?: LineCode | number; lineCode?: LineCode | number }
+>(items: T[]): T[] {
+  return filterByLineCode(items, LINE_4);
 }

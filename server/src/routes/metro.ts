@@ -5,7 +5,7 @@ import { Router, Request, Response } from "express";
 import {
   getRealtimePosition,
   getRealtimeArrival,
-  filterLine4,
+  filterByLineCode,
 } from "../services/seoulMetro";
 import { LineCode } from "../../../shared/types/metro";
 import { ApiResponse } from "../../../shared/types/metro";
@@ -68,9 +68,18 @@ router.get("/station/:name/arrivals", async (req: Request, res: Response) => {
   try {
     let arrivals = await getRealtimeArrival(stationName);
 
-    // ?line=1004 쿼리 처리 — 환승역에서 특정 호선만 보고 싶을 때
-    if (req.query.line === "1004") {
-      arrivals = filterLine4(arrivals);
+    // ?line=1001~1009 쿼리 처리 — 환승역에서 특정 호선만 보고 싶을 때.
+    // (강남: 2호선 1002 + 신분당선 1077 섞임 → line=1002 보내면 2호선만 추림)
+    const lineParam = req.query.line;
+    if (typeof lineParam === "string") {
+      const lineNum = Number(lineParam);
+      if (Number.isInteger(lineNum) && lineNum >= 1001 && lineNum <= 1009) {
+        const beforeCount = arrivals.length;
+        arrivals = filterByLineCode(arrivals, lineNum as LineCode);
+        console.log(
+          `[metro.routes] arrivals filter line=${lineNum}: ${beforeCount} → ${arrivals.length}`
+        );
+      }
     }
 
     return res.json(ok(arrivals));
