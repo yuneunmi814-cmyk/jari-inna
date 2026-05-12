@@ -13,14 +13,17 @@ import LineBadges from "./LineBadges";
 
 interface Props {
   station: string;
-  /** 명시적 호선들 — 없으면 TRANSFER_STATIONS lookup으로 자동 (4호선 기본) */
+  /** 명시적 호선들 — 호출자가 departureLine 등 컨텍스트 정보로 전달.
+   *  생략 시 TRANSFER_STATIONS lookup, 그래도 없으면 dot 안 보임. */
   lines?: LineKey[];
   onPress: () => void;
 }
 
 export default function StationSelector({ station, lines, onPress }: Props) {
-  // 명시되지 않으면: 환승역이면 모든 호선, 아니면 ['4'] (앱이 4호선 가정 상태)
-  const resolvedLines: LineKey[] = lines ?? TRANSFER_STATIONS[station] ?? ["4"];
+  // 명시 전달 우선 → 환승역 lookup → 빈 배열(dot 안 보임).
+  // ⚠️ 과거 ['4'] fallback 있었음 — 2호선 강남 등 단일호선 역에서 4호선 dot 잘못 표시되는
+  //    버그 유발. 호출자가 항상 LineKey 전달하게 함 (HomeScreen에서 departureLine 사용).
+  const resolvedLines: LineKey[] = lines ?? TRANSFER_STATIONS[station] ?? [];
 
   return (
     <Pressable

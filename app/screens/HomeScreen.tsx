@@ -126,9 +126,11 @@ export default function HomeScreen() {
           onAddNew={() => navigation.navigate("Favorites")}
         />
 
-        {/* 2. 출발역 카드 */}
+        {/* 2. 출발역 카드 — dot 컬러를 departureLine 기준으로 표시 */}
+        {/*    (안 넘기면 StationSelector 가 ["4"] 하드코딩 fallback) */}
         <StationSelector
           station={station}
+          lines={[departureLine]}
           onPress={() => navigation.navigate("StationPicker", { mode: "departure" })}
         />
 
