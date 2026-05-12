@@ -19,16 +19,16 @@ const lightPalette = {
   primaryBorder: "#FFB380",    // 옅은 오렌지 보더
   accent: "#FF6600",           // 강조 텍스트/포커스 — primary와 같은 값(의미적 구분만)
 
-  // === Subway Lines (호선 전용) ===
-  line4: "#0052A4",            // 4호선 블루
-  // line1: "#0D3692",         // 1호선 — Phase 2 추가 예정
-  // line2: "#00A84D",         // 2호선
-  // line3: "#EF7C1C",         // 3호선
-  // line5: "#996CAC",         // 5호선
-  // line6: "#CD7C2F",         // 6호선
-  // line7: "#747F00",         // 7호선
-  // line8: "#E6186C",         // 8호선
-  // line9: "#BDB092",         // 9호선
+  // === Subway Lines (호선별 공식 컬러) ===
+  line1: "#0052A4",            // 1호선 진청 (코레일/서울교통공사 공통)
+  line2: "#00A84D",            // 2호선 연두
+  line3: "#EF7C1C",            // 3호선 주황
+  line4: "#00A5DE",            // 4호선 하늘 (서울교통공사 공식 — 이전 #0052A4는 1호선이었음, 정정)
+  line5: "#996CAC",            // 5호선 보라
+  line6: "#CD7C2F",            // 6호선 갈색
+  line7: "#747F00",            // 7호선 올리브
+  line8: "#E6186C",            // 8호선 핑크
+  line9: "#BB8336",            // 9호선 황금
 
   // === Background Layers ===
   background: "#FFFFFF",
@@ -65,7 +65,16 @@ const darkPalette = {
   primaryBorder: "#7A3F1F",
   accent: "#FF6600",
 
-  line4: "#0052A4",
+  // 다크 모드용 호선 컬러 — 라이트 모드와 동일 (호선 컬러는 공식 표준)
+  line1: "#0052A4",
+  line2: "#00A84D",
+  line3: "#EF7C1C",
+  line4: "#00A5DE",
+  line5: "#996CAC",
+  line6: "#CD7C2F",
+  line7: "#747F00",
+  line8: "#E6186C",
+  line9: "#BB8336",
 
   background: "#0F1419",
   surface: "#1A2332",
