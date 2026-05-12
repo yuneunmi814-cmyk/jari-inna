@@ -15,11 +15,12 @@
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -123,6 +124,32 @@ export default function RecommendationScreen() {
   // 도착 정보 — 5초 폴링
   const arrivals = useArrivals(station);
 
+  // ─────────────────────────────────────────────────────────────
+  // Pull-to-Refresh — 혼잡도 + 도착정보 동시 재조회
+  // 5초 폴링과 별개로 사용자가 명시적으로 당겨 새로고침할 수 있게.
+  // useArrivals/useCongestion 둘 다 자체 refreshing state 있지만
+  // 화면 RefreshControl 은 별도 로컬 state 로 묶어 한 번에 토글.
+  // ─────────────────────────────────────────────────────────────
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    console.log("[RecommendationScreen] 새로고침 시작");
+    setRefreshing(true);
+    const startTime = Date.now();
+    try {
+      await Promise.all([congestion.refresh(), arrivals.refresh()]);
+      console.log(
+        "[RecommendationScreen] 새로고침 완료",
+        Date.now() - startTime,
+        "ms"
+      );
+    } catch (e) {
+      console.error("[RecommendationScreen] 새로고침 실패:", e);
+    } finally {
+      setRefreshing(false);
+    }
+    // congestion/arrivals refresh 함수는 stationName/station 변경 시 재생성됨
+  }, [congestion, arrivals]);
+
   // 방면 필터링 — 서울 API의 updnLine 사용
   // 호선별 라벨:
   //   - 일반 호선(1/3/4/5/6/7/8/9): "상행"/"하행"
@@ -194,6 +221,16 @@ export default function RecommendationScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            title="다시 가져오는 중..."
+            titleColor={colors.primary}
+          />
+        }
       >
         {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 */}
         {renderCongestionCard(congestion, selectedPlfNo, station, departureLine as LineKey)}

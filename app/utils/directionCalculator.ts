@@ -3,7 +3,8 @@
 // 호선별 방면:
 //   - 직선 노선 (1/3/4/5/7/8/9호선): 시발 ↔ 종착 일직선, index 비교
 //   - 순환선 (2호선): 시계 방향(내선) vs 반대(외선) — 짧은 경로 선택
-//   - 6호선: 응암역 부근 단방향 순환 있지만 일단 직선 처리 (추후 보강)
+//   - 6호선: 응암역에서만 단방향 순환 분기 (응암순환행 vs 봉화산행).
+//            그 외 출발역은 일반 직선 로직 (downTerminus = '봉화산').
 //
 // 데이터 source:
 //   - 4호선: line4Stations.ts LINE_4_STATIONS (47개, KORAIL/남양주 포함)
@@ -79,7 +80,65 @@ export function calculateDirection(
   if (lineCode === "2") {
     return direction2Loop(fromStation, toStation);
   }
+  // 6호선은 응암역에서 단방향 분기가 있어 응암 출발만 특수 처리
+  if (lineCode === "6") {
+    return direction6(fromStation, toStation);
+  }
   return directionLinear(fromStation, toStation, lineCode);
+}
+
+/**
+ * 6호선 응암 단방향 순환 처리
+ *
+ * 응암역은 실제로 단방향 루프 시발역:
+ *   응암 → 새절 → 증산 → DMC → 월드컵 → 마포구청 → 망원 → 합정 → ... → 봉화산
+ *   (반대 방향: 봉화산 → ... → 합정 → ... → 연신내 → 독바위 → 불광 → 역촌 → 응암)
+ *
+ * 사용자 명세 (단순화 모델):
+ *   case 1) 응암 → {새절,증산,DMC,월드컵,마포구청,망원,합정} → "응암순환행"
+ *   case 2) 응암 → 그 외 모든 역 (역촌/독바위/봉화산 등) → "봉화산행"
+ *   case 3) 응암이 출발이 아니면 → directionLinear (일반 호선 로직)
+ */
+const LINE6_LOOP_DESTINATIONS = new Set([
+  "새절",
+  "증산",
+  "디지털미디어시티",
+  "월드컵경기장",
+  "마포구청",
+  "망원",
+  "합정",
+]);
+
+function direction6(
+  fromStation: string,
+  toStation: string
+): DirectionResult | null {
+  if (fromStation !== "응암") {
+    return directionLinear(fromStation, toStation, "6");
+  }
+  if (fromStation === toStation) return null;
+
+  if (LINE6_LOOP_DESTINATIONS.has(toStation)) {
+    console.log(
+      "[directionCalc] 6호선 응암순환:",
+      fromStation,
+      "→",
+      toStation
+    );
+    return {
+      direction: "down",
+      terminus: "응암순환",
+      label: "응암순환행",
+      directionText: "응암순환 방면",
+    };
+  }
+  console.log("[directionCalc] 6호선 본선:", fromStation, "→", toStation);
+  return {
+    direction: "down",
+    terminus: "봉화산",
+    label: "봉화산행",
+    directionText: "봉화산 방면",
+  };
 }
 
 /**

@@ -79,9 +79,10 @@ export const LINES: Record<LineKey, LineMeta> = {
     colorKey: 'line6',
     congestionSupported: true,
     upTerminus: '응암순환',
-    downTerminus: '신내',
+    downTerminus: '봉화산',
+    // 신내는 실제 종점이지만 대부분 열차가 봉화산까지만 운행 → UX 우선 봉화산.
     upLabel: '응암 방면',
-    downLabel: '신내 방면',
+    downLabel: '봉화산 방면',
   },
   '7': {
     key: '7',
