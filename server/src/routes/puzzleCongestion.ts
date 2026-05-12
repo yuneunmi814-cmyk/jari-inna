@@ -349,7 +349,9 @@ router.get("/car-congestion/:stationName", async (req: Request, res: Response) =
       .status(404)
       .json(fail("STATION_NOT_FOUND", `${stationName} 역 정보를 못 찾았어요`));
   }
-  const stationCode = stationInfo.stinCd;
+  // PUZZLE 은 stationCode 의 앞 0 없이 받음 (9호선 "0901" → "901")
+  // 다른 호선은 영향 없음 (1호선 "150", 2호선 "222" 등 이미 0 없음)
+  const stationCode = stationInfo.stinCd.replace(/^0+/, "");
 
   // 캐시 키 = stationCode (호선별로 stinCd 다름)
   const cacheKey = stationCode;

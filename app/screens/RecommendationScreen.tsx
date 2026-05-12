@@ -368,8 +368,16 @@ export default function RecommendationScreen() {
           </View>
         )}
 
-        {/* 1-B. 정거장 평균 혼잡도 (KRIC, 호선 단위 평균) — 보조 정보로 유지 */}
-        {renderCongestionCard(congestion, selectedPlfNo, station, effectiveDepartureLine)}
+        {/* 1-B. 정거장 평균 혼잡도 (KRIC) — 보조 정보로 유지.
+              9호선은 KRIC 미지원 + PUZZLE 지원 → PUZZLE 있으면 KRIC 졸린 메시지 안 보이게.
+              (없으면 fallback 졸린 메시지 표시) */}
+        {!(effectiveDepartureLine === "9" && carCongestion.data) &&
+          renderCongestionCard(
+            congestion,
+            selectedPlfNo,
+            station,
+            effectiveDepartureLine
+          )}
 
         {/* 2. 경로 요약 — 같은 호선 trip 또는 지선(line2-branch) 만 표시.
               호선 환승(line-change) 은 환승 카드가 거리 정보 가져감. */}
