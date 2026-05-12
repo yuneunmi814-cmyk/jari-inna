@@ -47,8 +47,10 @@ import {
   calculateDirection,
   countStops,
   estimateTravelMinutes,
+  findTransfer,
   getDirectionFromTerminus,
   type DirectionResult,
+  type TransferInfo,
 } from "../utils/directionCalculator";
 
 /**
@@ -193,6 +195,22 @@ export default function RecommendationScreen() {
   const destInfo = destination ? getStationByName(destination) : undefined;
   const isDestinationTransfer = Boolean(destInfo?.isTransfer);
 
+  /**
+   * 환승 안내 — 출발/도착 호선이 다르거나(호선 환승) 2호선 지선 케이스(지선 환승)
+   * - 노원(4) → 강남(2): "사당에서 2호선으로 환승"
+   * - 강남(2 본선) → 까치산(2 신정지선): "신도림에서 신정지선으로 환승"
+   * 도착역이 단순히 환승역인 것과는 다른 정보 (저쪽은 도착 후 옵션).
+   */
+  const transferInfo: TransferInfo | null = useMemo(() => {
+    if (!destination || !destinationLine) return null;
+    return findTransfer(
+      station,
+      departureLine as LineKey,
+      destination,
+      destinationLine as LineKey
+    );
+  }, [station, departureLine, destination, destinationLine]);
+
   // 정거장 수 / 소요 시간 (호선별)
   const stops = destination ? countStops(station, destination, departureLine) : 0;
   const travelMin = destination
@@ -286,17 +304,41 @@ export default function RecommendationScreen() {
         />
         {renderArrivals(arrivals, filteredArrivals)}
 
-        {/* 4. 환승 안내 (Phase 2 예정) */}
+        {/* 4-A. 환승 안내 — 출발/도착 호선이 다르거나(호선 환승) 2호선 본선↔지선 */}
+        {transferInfo && (
+          <View style={styles.transferCardActive}>
+            <Text style={styles.transferIcon}>🔀</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.transferTitleActive}>환승 안내</Text>
+              <Text style={styles.transferBig}>
+                {transferInfo.at}역에서 갈아타세요
+              </Text>
+              <Text style={styles.transferRoute}>
+                {transferInfo.fromLineLabel}
+                {"  →  "}
+                <Text style={styles.transferRouteEmph}>
+                  {transferInfo.toLineLabel}
+                </Text>
+              </Text>
+              <Text style={styles.transferHint}>
+                {transferInfo.reason === "line2-branch"
+                  ? "지선은 본선에서 갈라지는 짧은 노선이에요"
+                  : "환승역 안내판 따라 이동하면 돼요"}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* 4-B. 도착역이 환승역인 경우 — 도착 후 옵션 (별도 정보, 위 카드와 공존) */}
         {isDestinationTransfer && (
           <View style={styles.transferCard}>
-            <Text style={styles.transferIcon}>🔄</Text>
+            <Text style={styles.transferIcon}>🚉</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.transferTitle}>
                 {destination}은(는) 환승역이에요
               </Text>
               <Text style={styles.transferDesc}>
-                도착하면 다른 노선으로 갈아탈 수 있어요.{"\n"}
-                자세한 환승 안내는 Phase 2에서 만나요!
+                도착 후 다른 노선으로 갈아탈 수 있어요.
               </Text>
             </View>
           </View>
@@ -778,7 +820,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
 
-  // 환승 카드
+  // 환승 카드 — 도착역이 환승역 (보조 정보)
   transferCard: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -801,6 +843,46 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     lineHeight: 20,
+  },
+
+  // 환승 카드 — Active (실제 환승 필요한 경로). 오렌지 강조 + 큰 텍스트
+  transferCardActive: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    gap: spacing.md,
+  },
+  transferTitleActive: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  transferBig: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: spacing.sm,
+  },
+  transferRoute: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  transferRouteEmph: {
+    color: colors.textPrimary,
+    fontWeight: "700",
+  },
+  transferHint: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    lineHeight: 18,
   },
 
   // 즐겨찾기 버튼

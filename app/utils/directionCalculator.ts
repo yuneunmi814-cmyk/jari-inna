@@ -19,6 +19,7 @@ import {
 import {
   LINES,
   LINE_STATIONS,
+  TRANSFER_STATIONS,
   type LineKey,
 } from "../constants/lines";
 
@@ -352,4 +353,118 @@ export function getStationsBetween(
   const [start, end] = fromIdx < toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
   const slice = LINE_4_STATIONS.slice(start, end + 1).map((s) => s.name);
   return fromIdx < toIdx ? slice : slice.reverse();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 환승 안내 — 지선 + 호선 환승 통합
+// ─────────────────────────────────────────────────────────────────
+
+/** 환승 안내 1건 */
+export interface TransferInfo {
+  /** 환승역 이름 (예: "신도림", "사당") */
+  at: string;
+  /** 환승 전 호선/구간 라벨 (예: "2호선 본선", "4호선") */
+  fromLineLabel: string;
+  /** 환승 후 호선/구간 라벨 (예: "2호선 신정지선", "2호선") */
+  toLineLabel: string;
+  /** 환승 사유 — "line-change"(호선 환승) / "line2-branch"(2호선 지선) */
+  reason: "line-change" | "line2-branch";
+}
+
+/** 2호선 지선 역 집합 — stinCd 와 무관하게 simpleName 기준 */
+const LINE2_SINJEONG_BRANCH = new Set([
+  "까치산",
+  "도림천",
+  "양천구청",
+  "신정네거리",
+]);
+const LINE2_SEONGSU_BRANCH = new Set(["용답", "신답", "신설동", "용두"]);
+
+/** 2호선 지선 ↔ 본선 환승역 */
+const LINE2_SINJEONG_JUNCTION = "신도림";
+const LINE2_SEONGSU_JUNCTION = "성수";
+
+type Line2Branch = "main" | "sinjeong" | "seongsu";
+
+function getLine2Branch(station: string): Line2Branch {
+  if (LINE2_SINJEONG_BRANCH.has(station)) return "sinjeong";
+  if (LINE2_SEONGSU_BRANCH.has(station)) return "seongsu";
+  return "main";
+}
+
+function line2BranchLabel(b: Line2Branch): string {
+  if (b === "sinjeong") return "2호선 신정지선";
+  if (b === "seongsu") return "2호선 성수지선";
+  return "2호선 본선";
+}
+
+/**
+ * 두 호선이 만나는 환승역 찾기.
+ * TRANSFER_STATIONS lookup — 첫 매치 반환.
+ * (여러 환승역 가능: 4↔2는 사당/동대문역사문화공원/서울역 — Phase B에서 경로상 최적화)
+ */
+function findInterchangeStation(
+  fromLine: LineKey,
+  toLine: LineKey
+): string | null {
+  for (const [station, lines] of Object.entries(TRANSFER_STATIONS)) {
+    if (lines.includes(fromLine) && lines.includes(toLine)) {
+      return station;
+    }
+  }
+  return null;
+}
+
+/**
+ * 환승 감지 — 출발 (역+호선) → 도착 (역+호선) 분석.
+ *
+ * 우선순위:
+ *   1) 호선이 다름 → "line-change"
+ *   2) 둘 다 2호선이지만 한쪽이 지선 → "line2-branch"
+ *   3) 그 외 → null (환승 불필요)
+ */
+export function findTransfer(
+  fromStation: string,
+  fromLine: LineKey,
+  toStation: string,
+  toLine: LineKey
+): TransferInfo | null {
+  // 1. 호선이 다르면 환승 필요
+  if (fromLine !== toLine) {
+    const at = findInterchangeStation(fromLine, toLine);
+    if (!at) {
+      // 두 호선이 직접 만나는 환승역 없음 (이론상 가능, 실무 거의 없음)
+      // console.log("[findTransfer] no direct interchange:", fromLine, toLine);
+      return null;
+    }
+    return {
+      at,
+      fromLineLabel: LINES[fromLine].name,
+      toLineLabel: LINES[toLine].name,
+      reason: "line-change",
+    };
+  }
+
+  // 2. 같은 호선이고 2호선이면 지선 체크
+  if (fromLine === "2") {
+    const fromBranch = getLine2Branch(fromStation);
+    const toBranch = getLine2Branch(toStation);
+    // 둘 다 본선이거나, 같은 지선 안 — 환승 X
+    if (fromBranch === toBranch) return null;
+    // 본선 ↔ 지선: 해당 지선의 junction 에서 환승
+    const branchSide = fromBranch !== "main" ? fromBranch : toBranch;
+    const at =
+      branchSide === "sinjeong"
+        ? LINE2_SINJEONG_JUNCTION
+        : LINE2_SEONGSU_JUNCTION;
+    return {
+      at,
+      fromLineLabel: line2BranchLabel(fromBranch),
+      toLineLabel: line2BranchLabel(toBranch),
+      reason: "line2-branch",
+    };
+  }
+
+  // 3. 같은 호선 (2호선 아니거나 같은 본선/지선) — 환승 불필요
+  return null;
 }
