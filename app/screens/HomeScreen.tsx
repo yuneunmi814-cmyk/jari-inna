@@ -143,9 +143,10 @@ export default function HomeScreen() {
         <View style={styles.tripCard}>
           <Text style={styles.tripLabel}>어디로 가세요?</Text>
 
-          {/* 방면 토글 */}
+          {/* 방면 토글 — 호선별 동적 라벨 (당고개행/오이도행은 4호선만) */}
           <DirectionToggle
             fromStation={station}
+            lineCode={departureLine}
             selected={direction}
             onChange={setDirection}
           />

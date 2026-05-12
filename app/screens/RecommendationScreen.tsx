@@ -118,12 +118,18 @@ export default function RecommendationScreen() {
 
   // 방면 정보 결정: 도착역 있으면 우선, 없으면 사용자가 고른 방면
   // effectiveDepartureLine 기반 (자동 매칭 적용)
+  // 호선별 종착역 — LINES dict 에서 동적으로 가져옴 (4호선 하드코딩 제거)
   const dirResult: DirectionResult | null = useMemo(() => {
     if (destination) {
       return calculateDirection(station, destination, effectiveDepartureLine);
     }
     if (direction) {
-      const terminus = direction === "up" ? "당고개" : "오이도"; // 4호선 fallback
+      const meta = LINES[effectiveDepartureLine];
+      // up/inner → upTerminus, down/outer → downTerminus
+      const terminus =
+        direction === "up" || direction === "inner"
+          ? meta.upTerminus
+          : meta.downTerminus;
       return getDirectionFromTerminus(station, terminus, effectiveDepartureLine);
     }
     return null;

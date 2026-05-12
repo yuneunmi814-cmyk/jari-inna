@@ -1,21 +1,29 @@
-// 방면 토글 (당고개행 / 오이도행)
+// 방면 토글 — 호선별 동적 라벨
 //
-// 시각 상태 3가지:
-//   - active   : 선택됨 (시안 보더 + 시안 글씨 + 시안 10% 배경 + weight 600)
-//   - inactive : 미선택   (회색 보더 + 흰색 글씨 + 표면 배경 + weight 500)
-//   - disabled : 본인이 종착역이라 못 감 (35% 투명 + 회색 글씨)
+// 호선별 라벨:
+//   - 4호선: 당고개행 (상행) / 오이도행 (하행)
+//   - 1호선: 서울역행 (상행) / 동묘앞행 (하행)
+//   - 2호선: 내선순환 (내선) / 외선순환 (외선) — 순환선이라 "행" 없음
+//   - 3호선: 대화행 / 오금행
+//   - 5호선: 방화행 / 하남검단산행
+//   - 6호선: 응암행 / 봉화산행
+//   - 7호선: 장암행 / 석남행
+//   - 8호선: 별내행 / 모란행
+//   - 9호선: 개화행 / 중앙보훈병원행
 //
-// 이전 버그: active 스타일이 풀리지 않고 두 칩 모두 시안색으로 남던 문제
-// 해결: 조건부 추가(`active && styles.X`) → 명시적 삼항(`active ? styles.X : styles.Y`)으로 교체
-//   → 비활성 칩에 inactive 스타일이 *반드시* 적용되어 색이 leakage 안 됨
+// 데이터 소스: LINES[lineCode] (단일 출처)
+//   - upTerminus/downTerminus → 라벨
+//   - upLabel/downLabel → 보조 안내
+//
+// reachable 처리:
+//   - 4호선: line4Stations 의 getReachableTermini (기존)
+//   - 2호선: 순환선 — 양 방향 항상 가능
+//   - 그 외: 출발역이 종착역이면 그 방면만 disable
 
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import {
-  getReachableTermini,
-  TERMINUS_DOWN,
-  TERMINUS_UP,
-} from "../constants/line4Stations";
+import { getReachableTermini } from "../constants/line4Stations";
+import { LINES, type LineKey } from "../constants/lines";
 import { colors } from "../theme/colors";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
@@ -24,6 +32,8 @@ import type { Direction } from "../utils/directionCalculator";
 interface Props {
   /** 출발역 — 갈 수 있는 방면 결정용 */
   fromStation: string;
+  /** 출발 호선 — 라벨/종착역 결정 (LINES dict) */
+  lineCode: LineKey;
   /** 현재 선택된 방면 (null이면 미선택) */
   selected: Direction | null;
   /** 토글 콜백. 같은 걸 다시 누르면 null 전달 */
@@ -39,8 +49,6 @@ interface ChipProps {
 }
 
 function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
-  // 우선순위: disabled > active > inactive
-  // 명시적 분기로 RN의 인라인 스타일 캐싱 가능성 차단
   const chipStateStyle = disabled
     ? styles.chipDisabled
     : active
@@ -77,31 +85,70 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
             }
       }
     >
-      <Text style={[styles.label, labelStateStyle]}>{label}</Text>
+      <Text style={[styles.label, labelStateStyle]} numberOfLines={1}>
+        {label}
+      </Text>
       <Text style={[styles.hint, hintStateStyle]}>{hint}</Text>
     </Pressable>
   );
 }
 
-export default function DirectionToggle({ fromStation, selected, onChange }: Props) {
-  const reachable = getReachableTermini(fromStation);
+/**
+ * 호선별 reachable 계산
+ * - 4호선: 기존 line4Stations getReachableTermini
+ * - 2호선: 순환선이라 양쪽 항상 가능
+ * - 그 외: 출발역이 종착역과 동일하면 그 방면 disable
+ */
+function computeReachable(
+  fromStation: string,
+  lineCode: LineKey
+): { up: boolean; down: boolean } {
+  if (lineCode === "4") {
+    const r = getReachableTermini(fromStation);
+    return { up: Boolean(r.up), down: Boolean(r.down) };
+  }
+  if (lineCode === "2") {
+    return { up: true, down: true };
+  }
+  const meta = LINES[lineCode];
+  return {
+    up: fromStation !== meta.upTerminus,
+    down: fromStation !== meta.downTerminus,
+  };
+}
+
+export default function DirectionToggle({
+  fromStation,
+  lineCode,
+  selected,
+  onChange,
+}: Props) {
+  const meta = LINES[lineCode];
+  const reachable = computeReachable(fromStation, lineCode);
   const toggle = (d: Direction) => onChange(selected === d ? null : d);
+
+  // 2호선만 순환 라벨 (행 없음), 그 외 호선은 "○○행"
+  const isCircle = lineCode === "2";
+  const upLabel = isCircle ? meta.upTerminus : `${meta.upTerminus}행`;
+  const downLabel = isCircle ? meta.downTerminus : `${meta.downTerminus}행`;
+  const upHint = isCircle ? "내선" : "상행";
+  const downHint = isCircle ? "외선" : "하행";
 
   return (
     <View style={styles.row}>
       <Chip
-        label={`${TERMINUS_UP}행`}
-        hint="상행"
-        active={selected === "up"}
+        label={upLabel}
+        hint={upHint}
+        active={selected === "up" || selected === "inner"}
         disabled={!reachable.up}
-        onPress={() => toggle("up")}
+        onPress={() => toggle(isCircle ? "inner" : "up")}
       />
       <Chip
-        label={`${TERMINUS_DOWN}행`}
-        hint="하행"
-        active={selected === "down"}
+        label={downLabel}
+        hint={downHint}
+        active={selected === "down" || selected === "outer"}
         disabled={!reachable.down}
-        onPress={() => toggle("down")}
+        onPress={() => toggle(isCircle ? "outer" : "down")}
       />
     </View>
   );
@@ -112,8 +159,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
   },
-
-  // chip 공통
   chip: {
     flex: 1,
     borderRadius: radius.md,
@@ -122,10 +167,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
   },
-
-  // chip 상태별 — 명시적 (active/inactive/disabled 모두 정의해 leakage 차단)
   chipActive: {
-    backgroundColor: colors.accent + "1A", // 약 10% opacity
+    backgroundColor: colors.accent + "1A",
     borderColor: colors.accent,
   },
   chipInactive: {
@@ -137,13 +180,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     opacity: 0.35,
   },
-
-  // label 공통
   label: {
     ...typography.bodyLg,
   },
-
-  // label 상태별
   labelActive: {
     color: colors.accent,
     fontWeight: "600",
@@ -156,14 +195,10 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontWeight: "500",
   },
-
-  // hint 공통
   hint: {
     ...typography.micro,
     marginTop: 2,
   },
-
-  // hint 상태별
   hintActive: { color: colors.accent },
   hintInactive: { color: colors.textSecondary },
   hintDisabled: { color: colors.textTertiary },
