@@ -15,7 +15,7 @@
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ArrivalCard from "../components/ArrivalCard";
+import CarCongestionCard from "../components/CarCongestionCard";
 import EmptyState from "../components/EmptyState";
 import LineBadges from "../components/LineBadges";
 import SectionHeader from "../components/SectionHeader";
@@ -36,6 +37,7 @@ import { LINES, TRANSFER_STATIONS, type LineKey } from "../constants/lines";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
+import { useCarCongestion } from "../hooks/useCarCongestion";
 import { useCongestion } from "../hooks/useCongestion";
 import type { CongestionLevel } from "../api/congestion";
 import type { RootStackParamList } from "../navigation/types";
@@ -96,8 +98,23 @@ export default function RecommendationScreen() {
   /** 자동 매칭이 일어났는지 (UI 안내용) */
   const lineAutoMatched = effectiveDepartureLine !== departureLine;
 
-  // 출발역 혼잡도 — KRIC stationCongestion (분기별 시간대 평균)
+  // 디버그 — 화면 진입 시 한 번 출력 (사용자 검증 시 진단용)
+  useEffect(() => {
+    console.log("[RecommendationScreen] state:", {
+      station,
+      departureLine,
+      destination,
+      destinationLine,
+      effectiveDepartureLine,
+      lineAutoMatched,
+    });
+  }, [station, departureLine, destination, destinationLine, effectiveDepartureLine, lineAutoMatched]);
+
+  // 출발역 혼잡도 — KRIC stationCongestion (정거장 평균, 분기별)
   const congestion = useCongestion(station);
+
+  // 출발역 칸별 혼잡도 — PUZZLE (SK Open API, 시간대별 + 칸별)
+  const carCongestion = useCarCongestion(station, effectiveDepartureLine);
 
   // 방면 정보 결정: 도착역 있으면 우선, 없으면 사용자가 고른 방면
   // effectiveDepartureLine 기반 (자동 매칭 적용)
@@ -328,7 +345,29 @@ export default function RecommendationScreen() {
           </View>
         )}
 
-        {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 (effective 호선 기반) */}
+        {/* 1-A. 칸별 혼잡도 (PUZZLE / SK Open API) — Phase 1 핵심 기능 */}
+        {/*       dirResult 의 inner/down → updnLine 1, outer/up → updnLine 0 (2호선 기준).
+                  호선별 정확 매핑은 백엔드 normalize 의 directionLabel 이 처리. */}
+        {carCongestion.data && (
+          <CarCongestionCard
+            data={carCongestion.data}
+            selectedDirection={
+              dirResult?.direction === "outer" || dirResult?.direction === "down"
+                ? 0
+                : dirResult?.direction === "inner" || dirResult?.direction === "up"
+                ? 1
+                : null
+            }
+          />
+        )}
+        {!carCongestion.data && carCongestion.loading && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.loadingText}>칸별 혼잡도 가져오는 중...</Text>
+          </View>
+        )}
+
+        {/* 1-B. 정거장 평균 혼잡도 (KRIC, 호선 단위 평균) — 보조 정보로 유지 */}
         {renderCongestionCard(congestion, selectedPlfNo, station, effectiveDepartureLine)}
 
         {/* 2. 경로 요약 — 같은 호선 trip 또는 지선(line2-branch) 만 표시.

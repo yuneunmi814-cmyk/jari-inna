@@ -15,7 +15,10 @@ import { AppState, AppStateStatus } from "react-native";
 import { getArrivals } from "../api/metro";
 import type { StationArrival } from "../../shared/types/metro";
 
-const POLL_INTERVAL_MS = 5000;
+// 30초 폴링 — 서울 열린데이터광장 무료 키 일일 1000건 한도 보호.
+// (5초였을 때: 1시간 720건, 1.5시간만 켜놔도 한도 초과)
+// 도착 정보는 분 단위 갱신이 보통이라 30초도 충분히 신선.
+const POLL_INTERVAL_MS = 30000;
 
 export function useArrivals(stationName: string, lineCode?: number) {
   const [data, setData] = useState<StationArrival[]>([]);

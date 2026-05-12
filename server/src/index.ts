@@ -12,6 +12,7 @@ import cors from "cors";
 import metroRouter from "./routes/metro";
 import debugRouter from "./routes/debug";
 import congestionRouter from "./routes/congestion";
+import puzzleCongestionRouter from "./routes/puzzleCongestion";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -38,6 +39,9 @@ app.use("/api/metro", metroRouter);
 
 // 혼잡도 API 라우트 (KRIC stationCongestion 정규화)
 app.use("/api/congestion", congestionRouter);
+
+// PUZZLE (SK Open API) 칸별 혼잡도 통계
+app.use("/api/puzzle", puzzleCongestionRouter);
 
 // 디버그 라우트 (개발 단계 전용) — Phase 통합 끝나면 제거 예정
 app.use("/debug", debugRouter);

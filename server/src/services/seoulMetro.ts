@@ -143,12 +143,29 @@ export async function getRealtimePosition(
   }));
 }
 
+// ─────────────────────────────────────────────────────────────
+// 도착 정보 캐시 (15초) — 서울 API 일일 1000건 한도 보호
+// 여러 폰이 같은 역 보고있으면 백엔드는 15초당 1번만 서울 API 호출.
+// ─────────────────────────────────────────────────────────────
+const ARRIVAL_CACHE_TTL_MS = 15 * 1000;
+interface ArrivalCacheEntry {
+  data: StationArrival[];
+  expiresAt: number;
+}
+const arrivalCache = new Map<string, ArrivalCacheEntry>();
+
 /**
- * 실시간 역 도착 정보 조회
+ * 실시간 역 도착 정보 조회 (15초 캐시)
  */
 export async function getRealtimeArrival(
   stationName: string
 ): Promise<StationArrival[]> {
+  const cached = arrivalCache.get(stationName);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log(`[seoulMetro] 캐시 hit: ${stationName}`);
+    return cached.data;
+  }
+
   const data = await callSeoulApi<any>(
     `realtimeStationArrival/0/20/${encodeURIComponent(stationName)}`,
     `realtimeStationArrival(${stationName})`
@@ -160,7 +177,7 @@ export async function getRealtimeArrival(
     );
   }
 
-  return data.realtimeArrivalList.map((item: any): StationArrival => ({
+  const arrivals: StationArrival[] = data.realtimeArrivalList.map((item: any): StationArrival => ({
     subwayId: Number(item.subwayId) as LineCode,
     trainLineNm: item.trainLineNm,
     statnNm: item.statnNm,
@@ -171,6 +188,14 @@ export async function getRealtimeArrival(
     recptnDt: item.recptnDt,
     updnLine: item.updnLine,
   }));
+
+  // 캐시 저장 (15초)
+  arrivalCache.set(stationName, {
+    data: arrivals,
+    expiresAt: Date.now() + ARRIVAL_CACHE_TTL_MS,
+  });
+
+  return arrivals;
 }
 
 /**
