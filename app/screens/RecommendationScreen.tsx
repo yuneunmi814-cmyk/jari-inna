@@ -345,9 +345,8 @@ export default function RecommendationScreen() {
           </View>
         )}
 
-        {/* 1-A. 칸별 혼잡도 (PUZZLE / SK Open API) — Phase 1 핵심 기능 */}
-        {/*       dirResult 의 inner/down → updnLine 1, outer/up → updnLine 0 (2호선 기준).
-                  호선별 정확 매핑은 백엔드 normalize 의 directionLabel 이 처리. */}
+        {/* 1-A. 칸별 혼잡도 (PUZZLE / SK Open API) — Phase 1 핵심 기능
+              + 다음 도착 열차의 종착(bstatnNm) 으로 정확한 칸 데이터 매칭 */}
         {carCongestion.data && (
           <CarCongestionCard
             data={carCongestion.data}
@@ -358,6 +357,8 @@ export default function RecommendationScreen() {
                 ? 1
                 : null
             }
+            // 사용자 방면 일치하는 첫 번째 도착 열차의 종착 — 가장 정확한 매칭
+            nextTrainDestination={filteredArrivals[0]?.bstatnNm}
           />
         )}
         {!carCongestion.data && carCongestion.loading && (

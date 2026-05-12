@@ -50,6 +50,10 @@ export interface NormalizedCarCongestion {
   hourLabel: string; // "퇴근시간"
   /** 두 방면 (외선/내선 또는 상행/하행) */
   directions: DirectionCongestion[];
+  /** 종착역별 칸 데이터 — 다음 도착 열차의 종착과 매칭해서 정확한 칸 정보 표시.
+   *  key: 정리된 종착역 이름 (예: "성수", "잠실", "신도림"). "역" / "(R)" / 괄호 제거.
+   *  서울 API 도착정보의 bstatnNm 도 같은 방식으로 정리 → 직접 매칭. */
+  byDestination: Record<string, DestinationCongestion>;
   /** 가장 한산한 방면 추천 (양 방면 평균 비교) */
   recommended?: {
     direction: 0 | 1;
@@ -58,6 +62,22 @@ export interface NormalizedCarCongestion {
     bestCongestion: number;
     reason: string;
   };
+}
+
+/**
+ * 특정 종착역으로 가는 열차의 칸 정보 (PUZZLE stat[] row 들의 종착역별 그룹 평균)
+ */
+export interface DestinationCongestion {
+  endStationName: string; // 원본 그대로 (예: "성수역")
+  endStationCode: string;
+  updnLine: 0 | 1;
+  directionLabel: string;
+  cars: number[]; // 1~10 칸 혼잡도 %
+  avgCongestion: number;
+  bestCarNo: number;
+  bestCongestion: number;
+  /** 평균에 합쳐진 stat row 개수 (디버그) */
+  rowCount: number;
 }
 
 export interface DirectionCongestion {
@@ -196,6 +216,9 @@ function normalize(
     };
   }
 
+  // 종착역별 그룹핑 — 다음 도착 열차의 종착과 매칭하기 위해
+  const byDestination = groupByDestination(stats, now, contents.subwayLine);
+
   return {
     stationName: contents.stationName,
     stationCode: contents.stationCode,
@@ -203,8 +226,80 @@ function normalize(
     time: `${now.hh}:${now.mm}`,
     hourLabel: now.hourLabel,
     directions,
+    byDestination,
     recommended,
   };
+}
+
+/**
+ * 종착역 이름 정리 — 매칭용 키
+ * "성수역" → "성수"
+ * "성수역(R)" → "성수" (지선 종착)
+ * "사당역" → "사당"
+ */
+function cleanDestKey(name: string): string {
+  return name
+    .replace(/\(.*\)/g, "")  // 괄호 안 제거
+    .replace(/역$/, "")       // 끝의 "역" 제거
+    .trim();
+}
+
+function groupByDestination(
+  stats: PuzzleStatRow[],
+  now: ReturnType<typeof getKstNow>,
+  subwayLine: string
+): Record<string, DestinationCongestion> {
+  // endStation 키별로 row 그룹
+  const groups = new Map<string, PuzzleStatRow[]>();
+  for (const row of stats) {
+    const key = cleanDestKey(row.endStationName);
+    if (!key) continue;
+    const arr = groups.get(key) ?? [];
+    arr.push(row);
+    groups.set(key, arr);
+  }
+
+  const out: Record<string, DestinationCongestion> = {};
+  for (const [key, rows] of groups.entries()) {
+    const carSums = new Array(10).fill(0);
+    let validCount = 0;
+    // updnLine은 같은 종착이면 같음 가정 (다르면 첫 row 기준)
+    const updnLine = rows[0].updnLine;
+    for (const row of rows) {
+      const bucket = pickTimeBucket(row.data, now.hh, now.mm);
+      if (!bucket || !Array.isArray(bucket.congestionCar)) continue;
+      for (let i = 0; i < 10; i++) {
+        carSums[i] += bucket.congestionCar[i] ?? 0;
+      }
+      validCount++;
+    }
+    if (validCount === 0) continue;
+    const cars = carSums.map((s) => Math.round(s / validCount));
+    const avgCongestion = Math.round(
+      cars.reduce((a, b) => a + b, 0) / cars.length
+    );
+    let bestCarNo = 1;
+    let bestCongestion = cars[0];
+    for (let i = 1; i < cars.length; i++) {
+      if (cars[i] < bestCongestion) {
+        bestCongestion = cars[i];
+        bestCarNo = i + 1;
+      }
+    }
+    out[key] = {
+      endStationName: rows[0].endStationName, // 원본 (예: "성수역")
+      endStationCode: rows[0].endStationCode,
+      updnLine,
+      directionLabel: getDirectionLabel(subwayLine, updnLine),
+      cars,
+      avgCongestion,
+      bestCarNo,
+      bestCongestion,
+      rowCount: validCount,
+    };
+  }
+
+  return out;
 }
 
 /**

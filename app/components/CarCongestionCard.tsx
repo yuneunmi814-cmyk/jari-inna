@@ -11,9 +11,14 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type {
   CarCongestionData,
+  DestinationCongestion,
   DirectionCongestion,
 } from "../api/carCongestion";
-import { carCongestionLabel, carCongestionLevel } from "../api/carCongestion";
+import {
+  carCongestionLabel,
+  carCongestionLevel,
+  cleanDestinationKey,
+} from "../api/carCongestion";
 import { colors } from "../theme/colors";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
@@ -22,6 +27,9 @@ interface Props {
   data: CarCongestionData;
   /** 사용자가 갈 방면 (0=외선/하행, 1=내선/상행). 없으면 추천 방면 우선 */
   selectedDirection?: 0 | 1 | null;
+  /** 다음 도착 열차의 종착역 (서울 API bstatnNm).
+   *  있으면 byDestination[종착] 데이터 우선 표시 (가장 정확한 매칭). */
+  nextTrainDestination?: string;
 }
 
 function levelColor(pct: number): string {
@@ -94,8 +102,50 @@ function DirectionBlock({
   );
 }
 
-export default function CarCongestionCard({ data, selectedDirection }: Props) {
-  // 사용자 방면 우선, 없으면 추천 방면 강조
+/** 다음 열차 종착 매칭 블록 — 가장 정확한 칸 정보 */
+function NextTrainBlock({
+  dest,
+  destinationName,
+}: {
+  dest: DestinationCongestion;
+  destinationName: string;
+}) {
+  return (
+    <View style={styles.nextTrainBlock}>
+      <Text style={styles.nextTrainBadge}>🎯 다음 도착 열차</Text>
+      <Text style={styles.nextTrainTitle}>
+        {destinationName}행 · {dest.directionLabel}
+      </Text>
+      <View style={styles.barRow}>
+        {dest.cars.map((pct, idx) => (
+          <CarBar
+            key={idx}
+            carNo={idx + 1}
+            pct={pct}
+            isBest={idx + 1 === dest.bestCarNo}
+          />
+        ))}
+      </View>
+      <Text style={styles.bestHint}>
+        💡 {destinationName}행은 {dest.bestCarNo}번 칸이 가장 한산해요 (
+        {dest.bestCongestion}%)
+      </Text>
+    </View>
+  );
+}
+
+export default function CarCongestionCard({
+  data,
+  selectedDirection,
+  nextTrainDestination,
+}: Props) {
+  // 1순위: 다음 도착 열차의 종착 매칭 (가장 정확)
+  const destKey = nextTrainDestination
+    ? cleanDestinationKey(nextTrainDestination)
+    : "";
+  const matchedDest = destKey ? data.byDestination?.[destKey] : undefined;
+
+  // 2순위: 사용자 방면 또는 추천 방면 (방향 평균)
   const primaryDir = selectedDirection ?? data.recommended?.direction ?? 0;
   const dirs = data.directions;
   const primary = dirs.find((d) => d.updnLine === primaryDir);
@@ -109,12 +159,22 @@ export default function CarCongestionCard({ data, selectedDirection }: Props) {
         </Text>
       </View>
 
-      {primary && <DirectionBlock dir={primary} emphasis />}
+      {/* 1순위 — 다음 도착 열차 종착 매칭 (있으면) */}
+      {matchedDest && (
+        <NextTrainBlock dest={matchedDest} destinationName={destKey} />
+      )}
+
+      {/* 2순위 — 방면별 평균 (보조 정보) */}
+      {primary && (
+        <DirectionBlock dir={primary} emphasis={!matchedDest} />
+      )}
       {other && <DirectionBlock dir={other} emphasis={false} />}
 
       <View style={styles.disclosure}>
         <Text style={styles.disclosureText}>
-          PUZZLE (SK Open API) 시간대별 평균
+          {matchedDest
+            ? "PUZZLE 종착역별 시간대 평균"
+            : "PUZZLE (SK Open API) 방면 평균"}
         </Text>
       </View>
     </View>
@@ -205,6 +265,31 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: spacing.sm,
   },
+
+  // 다음 도착 열차 종착 매칭 블록 — 가장 강조 (오렌지 두꺼운 보더)
+  nextTrainBlock: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  nextTrainBadge: {
+    ...typography.micro,
+    color: colors.primary,
+    fontWeight: "700",
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  nextTrainTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: spacing.sm,
+  },
+
   disclosure: {
     marginTop: spacing.md,
     paddingTop: spacing.md,

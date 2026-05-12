@@ -57,6 +57,9 @@ export interface StationArrival {
   recptnDt: string;         // 수신 시각
   // 서울 API는 한글로 반환 — 일반 호선은 "상행"/"하행", 2호선 순환선은 "내선"/"외선"
   updnLine: "상행" | "하행" | "내선" | "외선";
+  // 종착역 이름 (PUZZLE 칸별 혼잡도 매칭용)
+  // 예: "성수", "잠실", "오이도", "신도림"
+  bstatnNm: string;
 }
 
 /**

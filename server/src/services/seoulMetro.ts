@@ -187,6 +187,7 @@ export async function getRealtimeArrival(
     barvlDt: item.barvlDt,
     recptnDt: item.recptnDt,
     updnLine: item.updnLine,
+    bstatnNm: item.bstatnNm ?? "", // PUZZLE 매칭용 종착역
   }));
 
   // 캐시 저장 (15초)

@@ -19,6 +19,18 @@ export interface DirectionCongestion {
   bestCongestion: number;
 }
 
+export interface DestinationCongestion {
+  endStationName: string; // 원본 "성수역"
+  endStationCode: string;
+  updnLine: 0 | 1;
+  directionLabel: string;
+  cars: number[];
+  avgCongestion: number;
+  bestCarNo: number;
+  bestCongestion: number;
+  rowCount: number;
+}
+
 export interface CarCongestionData {
   stationName: string;
   stationCode: string;
@@ -28,6 +40,8 @@ export interface CarCongestionData {
   /** "퇴근시간" / "출근시간" / "점심시간" / "심야시간" / "일반시간" */
   hourLabel: string;
   directions: DirectionCongestion[];
+  /** 종착역 정리 키 ("성수", "잠실") → 칸 데이터 */
+  byDestination: Record<string, DestinationCongestion>;
   recommended?: {
     direction: 0 | 1;
     directionLabel: string;
@@ -35,6 +49,18 @@ export interface CarCongestionData {
     bestCongestion: number;
     reason: string;
   };
+}
+
+/**
+ * 종착역 이름 정리 (앱쪽) — 백엔드 cleanDestKey 와 동일 규칙.
+ * bstatnNm 또는 trainLineNm 추출 종착 → byDestination 키 매칭용.
+ */
+export function cleanDestinationKey(name: string): string {
+  if (!name) return "";
+  return name
+    .replace(/\(.*\)/g, "")
+    .replace(/역$/, "")
+    .trim();
 }
 
 /**
