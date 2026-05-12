@@ -169,16 +169,23 @@ function normalize(
     if (validCount === 0) continue;
 
     const cars = carSums.map((sum) => Math.round(sum / validCount));
-    const avgCongestion = Math.round(
-      cars.reduce((a, b) => a + b, 0) / cars.length
-    );
+    // 9호선/일부 1호선은 6량/8량 편성 → 미운행 칸이 0% 로 옴.
+    // 평균/최저 계산 시 0 은 "운행 X" 로 보고 제외.
+    const operatingCars = cars
+      .map((c, idx) => ({ c, carNo: idx + 1 }))
+      .filter((x) => x.c > 0);
+    const avgCongestion =
+      operatingCars.length > 0
+        ? Math.round(
+            operatingCars.reduce((a, b) => a + b.c, 0) / operatingCars.length
+          )
+        : 0;
     let bestCarNo = 1;
-    let bestCongestion = cars[0];
-    for (let i = 1; i < cars.length; i++) {
-      if (cars[i] < bestCongestion) {
-        bestCongestion = cars[i];
-        bestCarNo = i + 1;
-      }
+    let bestCongestion = 0;
+    if (operatingCars.length > 0) {
+      const best = operatingCars.reduce((a, b) => (a.c <= b.c ? a : b));
+      bestCarNo = best.carNo;
+      bestCongestion = best.c;
     }
 
     directions.push({
@@ -275,16 +282,22 @@ function groupByDestination(
     }
     if (validCount === 0) continue;
     const cars = carSums.map((s) => Math.round(s / validCount));
-    const avgCongestion = Math.round(
-      cars.reduce((a, b) => a + b, 0) / cars.length
-    );
+    // 운행 칸만 (0은 미운행) — directions 와 동일 로직
+    const operatingCars = cars
+      .map((c, idx) => ({ c, carNo: idx + 1 }))
+      .filter((x) => x.c > 0);
+    const avgCongestion =
+      operatingCars.length > 0
+        ? Math.round(
+            operatingCars.reduce((a, b) => a + b.c, 0) / operatingCars.length
+          )
+        : 0;
     let bestCarNo = 1;
-    let bestCongestion = cars[0];
-    for (let i = 1; i < cars.length; i++) {
-      if (cars[i] < bestCongestion) {
-        bestCongestion = cars[i];
-        bestCarNo = i + 1;
-      }
+    let bestCongestion = 0;
+    if (operatingCars.length > 0) {
+      const best = operatingCars.reduce((a, b) => (a.c <= b.c ? a : b));
+      bestCarNo = best.carNo;
+      bestCongestion = best.c;
     }
     out[key] = {
       endStationName: rows[0].endStationName, // 원본 (예: "성수역")

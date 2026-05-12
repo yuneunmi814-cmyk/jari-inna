@@ -40,7 +40,8 @@ function levelColor(pct: number): string {
   return colors.danger;
 }
 
-/** 가로 바 1개 — 칸 번호 + 혼잡도 색상 */
+/** 가로 바 1개 — 칸 번호 + 혼잡도 색상.
+ *  pct === 0 이면 미운행 칸 (9호선 6량, 1호선 일부 8량) → 회색 + 작은 표시 */
 function CarBar({
   carNo,
   pct,
@@ -50,16 +51,27 @@ function CarBar({
   pct: number;
   isBest: boolean;
 }) {
+  const isOperating = pct > 0;
   return (
     <View style={styles.barCol}>
       <View
         style={[
           styles.bar,
-          { backgroundColor: levelColor(pct) },
-          isBest && styles.barBest,
+          isOperating
+            ? { backgroundColor: levelColor(pct) }
+            : styles.barInactive,
+          isBest && isOperating && styles.barBest,
         ]}
       />
-      <Text style={[styles.carNo, isBest && styles.carNoBest]}>{carNo}</Text>
+      <Text
+        style={[
+          styles.carNo,
+          isBest && isOperating && styles.carNoBest,
+          !isOperating && styles.carNoInactive,
+        ]}
+      >
+        {carNo}
+      </Text>
     </View>
   );
 }
@@ -243,6 +255,11 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     borderRadius: 4,
   },
+  barInactive: {
+    // 미운행 칸 (6량/8량 편성의 빈 자리) — 옅은 회색 패턴
+    backgroundColor: colors.divider,
+    opacity: 0.4,
+  },
   barBest: {
     borderWidth: 2,
     borderColor: colors.primary,
@@ -258,6 +275,10 @@ const styles = StyleSheet.create({
   carNoBest: {
     color: colors.primary,
     fontWeight: "700",
+  },
+  carNoInactive: {
+    color: colors.divider,
+    opacity: 0.5,
   },
   bestHint: {
     ...typography.body,
