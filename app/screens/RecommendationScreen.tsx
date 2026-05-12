@@ -32,7 +32,7 @@ import EmptyState from "../components/EmptyState";
 import LineBadges from "../components/LineBadges";
 import SectionHeader from "../components/SectionHeader";
 import { getStationByName } from "../constants/line4Stations";
-import { LINES, type LineKey } from "../constants/lines";
+import { LINES, TRANSFER_STATIONS, type LineKey } from "../constants/lines";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
@@ -70,23 +70,47 @@ export default function RecommendationScreen() {
   const { station, departureLine, destination, destinationLine, direction, resetTrip } = useStation();
   const { addFavorite, isFavorite } = useFavorites();
 
+  // ─────────────────────────────────────────────────────────────
+  // 자동 호선 매칭 — 환승역에서 출발할 때 도착 호선이 가용하면 그쪽으로
+  //
+  // 예) 사당(2,4) 4호선 선택 → 강남(2호선) 가야 함
+  //     → 사당에서 2호선도 잡힘 → effectiveDepartureLine = '2'
+  //     → 도착정보/정거장수/혼잡도 모두 2호선 기준 (한 번에 가는 trip)
+  //
+  // 매칭 안 되면 (노원(4,7) → 강남(2): 2가 노원에 없음) →
+  //   사용자 선택 호선 유지 + 환승 카드 표시 (4→2 환승 필요)
+  // ─────────────────────────────────────────────────────────────
+  const effectiveDepartureLine = useMemo<LineKey>(() => {
+    if (!destinationLine || destinationLine === departureLine) return departureLine;
+    const availableAtStation = TRANSFER_STATIONS[station];
+    if (availableAtStation && availableAtStation.includes(destinationLine)) {
+      // 자동 매칭됨 — 사용자가 고른 호선 != 도착 호선이지만, 출발역에 도착 호선 잡힘
+      console.log(
+        `[RecommendationScreen] 자동 호선 매칭: ${departureLine} → ${destinationLine} (${station}에서 ${destinationLine} 잡힘)`
+      );
+      return destinationLine;
+    }
+    return departureLine;
+  }, [station, departureLine, destinationLine]);
+
+  /** 자동 매칭이 일어났는지 (UI 안내용) */
+  const lineAutoMatched = effectiveDepartureLine !== departureLine;
+
   // 출발역 혼잡도 — KRIC stationCongestion (분기별 시간대 평균)
   const congestion = useCongestion(station);
 
   // 방면 정보 결정: 도착역 있으면 우선, 없으면 사용자가 고른 방면
-  // departureLine을 넘겨 호선별 일반화된 방면 계산
+  // effectiveDepartureLine 기반 (자동 매칭 적용)
   const dirResult: DirectionResult | null = useMemo(() => {
     if (destination) {
-      return calculateDirection(station, destination, departureLine);
+      return calculateDirection(station, destination, effectiveDepartureLine);
     }
     if (direction) {
-      // direction이 "up"/"down"일 때 호선별 종착역 lookup
-      // (2호선 순환은 direction "inner"/"outer"라 이 분기 안 거침)
       const terminus = direction === "up" ? "당고개" : "오이도"; // 4호선 fallback
-      return getDirectionFromTerminus(station, terminus, departureLine);
+      return getDirectionFromTerminus(station, terminus, effectiveDepartureLine);
     }
     return null;
-  }, [station, destination, direction, departureLine]);
+  }, [station, destination, direction, effectiveDepartureLine]);
 
   // 헤더 타이틀 — 도착역 유무에 따라
   const headerTitle = destination
@@ -100,11 +124,11 @@ export default function RecommendationScreen() {
    * - 도착역 없으면 출발 호선만
    */
   const tripLineKeys: LineKey[] = useMemo(() => {
-    const dep = departureLine as LineKey;
+    const dep = effectiveDepartureLine;
     if (!destination || !destinationLine) return [dep];
     const dst = destinationLine as LineKey;
     return dep === dst ? [dep] : [dep, dst];
-  }, [departureLine, destination, destinationLine]);
+  }, [effectiveDepartureLine, destination, destinationLine]);
 
   /**
    * 사용자 선택 방면에 대응하는 plfNo
@@ -124,10 +148,9 @@ export default function RecommendationScreen() {
   };
 
   // 도착 정보 — 5초 폴링.
-  // 강남(1002+1077 신분당 섞임), 노원(1004+1007) 같은 환승역에서
-  // 사용자가 고른 출발 호선만 받기 위해 lineCode (1000+N) 전달.
-  // 매핑: '2' → 1002, '4' → 1004 ...
-  const departureLineCode = 1000 + Number(departureLine);
+  // effectiveDepartureLine 기반 — 자동 매칭됐으면 그 호선 도착 정보 가져옴.
+  // 예: 사당 4호선 선택했지만 강남(2호선)행이면 사당 2호선 도착 정보.
+  const departureLineCode = 1000 + Number(effectiveDepartureLine);
   const arrivals = useArrivals(station, departureLineCode);
 
   // ─────────────────────────────────────────────────────────────
@@ -197,25 +220,48 @@ export default function RecommendationScreen() {
 
   /**
    * 환승 안내 — 출발/도착 호선이 다르거나(호선 환승) 2호선 지선 케이스(지선 환승)
-   * - 노원(4) → 강남(2): "사당에서 2호선으로 환승"
-   * - 강남(2 본선) → 까치산(2 신정지선): "신도림에서 신정지선으로 환승"
-   * 도착역이 단순히 환승역인 것과는 다른 정보 (저쪽은 도착 후 옵션).
+   * effectiveDepartureLine 기반 — 자동 매칭됐으면 환승 카드 안 뜸 (같은 호선 trip)
    */
   const transferInfo: TransferInfo | null = useMemo(() => {
     if (!destination || !destinationLine) return null;
     return findTransfer(
       station,
-      departureLine as LineKey,
+      effectiveDepartureLine,
       destination,
       destinationLine as LineKey
     );
-  }, [station, departureLine, destination, destinationLine]);
+  }, [station, effectiveDepartureLine, destination, destinationLine]);
 
-  // 정거장 수 / 소요 시간 (호선별)
-  const stops = destination ? countStops(station, destination, departureLine) : 0;
-  const travelMin = destination
-    ? estimateTravelMinutes(station, destination, departureLine)
-    : 0;
+  /**
+   * 환승역까지 정거장 수 / 시간 — 호선 환승(line-change) trip에서 의미 있음.
+   * 같은 호선이면 출발→도착 전체 거리.
+   * 다른 호선이면 출발→환승역 (출발 호선 안에서) 거리.
+   */
+  const stops = useMemo(() => {
+    if (!destination) return 0;
+    if (transferInfo?.reason === "line-change") {
+      return countStops(station, transferInfo.at, effectiveDepartureLine);
+    }
+    return countStops(station, destination, effectiveDepartureLine);
+  }, [station, destination, effectiveDepartureLine, transferInfo]);
+
+  const travelMin = useMemo(() => {
+    if (!destination) return 0;
+    if (transferInfo?.reason === "line-change") {
+      // 환승 trip: 출발→환승 거리 + 환승 후 거리 (대략 합산)
+      const beforeTransfer = estimateTravelMinutes(
+        station,
+        transferInfo.at,
+        effectiveDepartureLine
+      );
+      const afterTransfer = destinationLine
+        ? estimateTravelMinutes(transferInfo.at, destination, destinationLine)
+        : 0;
+      // 환승 자체 소요 ~3분 가산
+      return beforeTransfer + afterTransfer + 3;
+    }
+    return estimateTravelMinutes(station, destination, effectiveDepartureLine);
+  }, [station, destination, effectiveDepartureLine, destinationLine, transferInfo]);
 
   // 즐겨찾기 추가 — Phase 1은 도착역 단순 즐겨찾기로 처리 (Phase 2에서 경로 즐겨찾기로 확장)
   const alreadyFav = destination ? isFavorite(destination) : false;
@@ -272,11 +318,22 @@ export default function RecommendationScreen() {
           />
         }
       >
-        {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 */}
-        {renderCongestionCard(congestion, selectedPlfNo, station, departureLine as LineKey)}
+        {/* 0. 자동 호선 매칭 안내 — 환승역에서 도착 호선이 가용해서 자동 매칭됐을 때 */}
+        {lineAutoMatched && destination && destinationLine && (
+          <View style={styles.autoMatchBanner}>
+            <Text style={styles.autoMatchText}>
+              💡 {destination}이(가) {LINES[destinationLine as LineKey].name}이라{" "}
+              {station} {LINES[destinationLine as LineKey].name}으로 안내해요
+            </Text>
+          </View>
+        )}
 
-        {/* 2. 경로 요약 (도착역 있을 때만) */}
-        {destination && (
+        {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 (effective 호선 기반) */}
+        {renderCongestionCard(congestion, selectedPlfNo, station, effectiveDepartureLine)}
+
+        {/* 2. 경로 요약 — 같은 호선 trip 또는 지선(line2-branch) 만 표시.
+              호선 환승(line-change) 은 환승 카드가 거리 정보 가져감. */}
+        {destination && transferInfo?.reason !== "line-change" && (
           <View style={styles.tripSummary}>
             <View style={styles.tripStat}>
               <Text style={styles.tripStatValue}>{stops}</Text>
@@ -304,7 +361,7 @@ export default function RecommendationScreen() {
         />
         {renderArrivals(arrivals, filteredArrivals)}
 
-        {/* 4-A. 환승 안내 — 출발/도착 호선이 다르거나(호선 환승) 2호선 본선↔지선 */}
+        {/* 4-A. 환승 안내 — 호선 환승(line-change) 또는 2호선 지선(line2-branch) */}
         {transferInfo && (
           <View style={styles.transferCardActive}>
             <Text style={styles.transferIcon}>🔀</Text>
@@ -320,6 +377,12 @@ export default function RecommendationScreen() {
                   {transferInfo.toLineLabel}
                 </Text>
               </Text>
+              {/* 호선 환승일 때만 거리/시간 표시 — 지선은 위 tripSummary가 같은 정보 표시 */}
+              {transferInfo.reason === "line-change" && stops > 0 && (
+                <Text style={styles.transferDistance}>
+                  환승역까지 {stops}정거장 · 환승 포함 약 {travelMin}분
+                </Text>
+              )}
               <Text style={styles.transferHint}>
                 {transferInfo.reason === "line2-branch"
                   ? "지선은 본선에서 갈라지는 짧은 노선이에요"
@@ -879,9 +942,31 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: "700",
   },
+  transferDistance: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: "600",
+    marginBottom: spacing.xs,
+  },
   transferHint: {
     ...typography.caption,
     color: colors.textTertiary,
+    lineHeight: 18,
+  },
+
+  // 자동 호선 매칭 안내 배너 — 사당(4선택) → 강남(2) 자동 매칭 같은 케이스
+  autoMatchBanner: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  autoMatchText: {
+    ...typography.caption,
+    color: colors.textPrimary,
     lineHeight: 18,
   },
 
