@@ -120,12 +120,8 @@ function direction6(
   if (fromStation === toStation) return null;
 
   if (LINE6_LOOP_DESTINATIONS.has(toStation)) {
-    console.log(
-      "[directionCalc] 6호선 응암순환:",
-      fromStation,
-      "→",
-      toStation
-    );
+    // 디버그 — 리렌더 시 로그 산사태 방지 위해 주석 처리. 필요 시 임시 활성화.
+    // console.log("[directionCalc] 6호선 응암순환:", fromStation, "→", toStation);
     return {
       direction: "down",
       terminus: "응암순환",
@@ -133,7 +129,7 @@ function direction6(
       directionText: "응암순환 방면",
     };
   }
-  console.log("[directionCalc] 6호선 본선:", fromStation, "→", toStation);
+  // console.log("[directionCalc] 6호선 본선:", fromStation, "→", toStation);
   return {
     direction: "down",
     terminus: "봉화산",
@@ -470,11 +466,8 @@ export function findTransfer(
       // 두 호선이 직접 만나는 환승역 없음 (이론상 가능, 실무 거의 없음)
       return null;
     }
-    console.log(
-      "[findTransfer] 최적 환승역:",
-      at,
-      `(${fromStation} ${fromLine}호선 → ${toStation} ${toLine}호선)`
-    );
+    // 디버그 — 리렌더 시 로그 산사태 방지 위해 주석 처리. 필요 시 임시 활성화.
+    // console.log("[findTransfer] 최적 환승역:", at, `(${fromStation} ${fromLine}호선 → ${toStation} ${toLine}호선)`);
     return {
       at,
       fromLineLabel: LINES[fromLine].name,

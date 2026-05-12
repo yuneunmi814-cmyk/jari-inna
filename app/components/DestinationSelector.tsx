@@ -3,7 +3,7 @@
 // - 선택됐을 때: 역명 + 방면 자동 계산 결과 + 우측 ✕ 비우기 버튼
 // - 탭하면 도착역 picker 열기
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme/colors";
 import { radius, spacing } from "../theme/spacing";
@@ -30,6 +30,14 @@ export default function DestinationSelector({
   onPress,
   onClear,
 }: Props) {
+  // 호선별 방면 자동 계산 — useMemo 로 안정화.
+  // 부모(HomeScreen)가 도착정보 폴링(30초) + 위치 폴링(30초) 으로 리렌더 빈번하므로,
+  // fromStation/destination/fromLineCode 안 바뀌면 calculateDirection 재실행 X.
+  const dir = useMemo(() => {
+    if (!destination) return null;
+    return calculateDirection(fromStation, destination, fromLineCode ?? "4");
+  }, [fromStation, destination, fromLineCode]);
+
   // 비어있을 때
   if (!destination) {
     return (
@@ -47,8 +55,6 @@ export default function DestinationSelector({
     );
   }
 
-  // 선택됐을 때 — 호선별 방면 자동 계산
-  const dir = calculateDirection(fromStation, destination, fromLineCode ?? "4");
   return (
     <View style={styles.filled}>
       <Pressable
