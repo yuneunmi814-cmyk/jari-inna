@@ -14,7 +14,13 @@ import { colors } from "../theme/colors";
 
 interface Props {
   lines: LineKey[];
-  variant?: "badge" | "dot";
+  /**
+   * variant:
+   *   - "badge" (기본): 둥근 사각형 안 호선 번호 (역 리스트용)
+   *   - "dot":          작은 원형 점 (홈 출발역 카드)
+   *   - "pill":         호선명 텍스트 알약 (RecommendationScreen 헤더)
+   */
+  variant?: "badge" | "dot" | "pill";
 }
 
 /** 호선 키 → 컬러 hex (LINES dict 단일 출처) */
@@ -39,7 +45,23 @@ export default function LineBadges({ lines, variant = "badge" }: Props) {
     );
   }
 
-  // badge
+  if (variant === "pill") {
+    return (
+      <View style={styles.row}>
+        {lines.map((ln) => (
+          <View
+            key={ln}
+            style={[styles.pill, { backgroundColor: lineColor(ln) }]}
+            accessibilityLabel={`${LINES[ln].name}`}
+          >
+            <Text style={styles.pillText}>{LINES[ln].name}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  // badge (기본) — 둥근 사각형 + 호선 번호
   return (
     <View style={styles.row}>
       {lines.map((ln) => (
@@ -83,5 +105,18 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
+  },
+
+  // pill — 호선명 텍스트 알약
+  pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  pillText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
   },
 });

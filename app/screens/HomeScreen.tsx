@@ -158,6 +158,7 @@ export default function HomeScreen() {
           {/* 도착역 카드 */}
           <DestinationSelector
             fromStation={station}
+            fromLineCode={departureLine}
             destination={destination}
             onPress={handleOpenDestinationPicker}
             onClear={() => setDestination(null)}

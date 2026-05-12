@@ -13,6 +13,8 @@ import { calculateDirection } from "../utils/directionCalculator";
 interface Props {
   /** 출발역 — 방면 계산용 */
   fromStation: string;
+  /** 출발역 호선 — 호선별 방면 라벨 (기본 '4') */
+  fromLineCode?: string;
   /** 선택된 도착역 (null이면 미선택) */
   destination: string | null;
   /** 카드 탭 — picker 열기 */
@@ -23,6 +25,7 @@ interface Props {
 
 export default function DestinationSelector({
   fromStation,
+  fromLineCode,
   destination,
   onPress,
   onClear,
@@ -44,8 +47,8 @@ export default function DestinationSelector({
     );
   }
 
-  // 선택됐을 때 — 방면 자동 계산
-  const dir = calculateDirection(fromStation, destination);
+  // 선택됐을 때 — 호선별 방면 자동 계산
+  const dir = calculateDirection(fromStation, destination, fromLineCode ?? "4");
   return (
     <View style={styles.filled}>
       <Pressable

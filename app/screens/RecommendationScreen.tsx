@@ -28,8 +28,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import ArrivalCard from "../components/ArrivalCard";
 import EmptyState from "../components/EmptyState";
+import LineBadges from "../components/LineBadges";
 import SectionHeader from "../components/SectionHeader";
 import { getStationByName } from "../constants/line4Stations";
+import { LINES, type LineKey } from "../constants/lines";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
@@ -62,26 +64,44 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, "Recommendation">;
 
 export default function RecommendationScreen() {
   const navigation = useNavigation<NavProp>();
-  const { station, destination, direction, resetTrip } = useStation();
+  const { station, departureLine, destination, destinationLine, direction, resetTrip } = useStation();
   const { addFavorite, isFavorite } = useFavorites();
 
   // 출발역 혼잡도 — KRIC stationCongestion (분기별 시간대 평균)
   const congestion = useCongestion(station);
 
   // 방면 정보 결정: 도착역 있으면 우선, 없으면 사용자가 고른 방면
+  // departureLine을 넘겨 호선별 일반화된 방면 계산
   const dirResult: DirectionResult | null = useMemo(() => {
-    if (destination) return calculateDirection(station, destination);
+    if (destination) {
+      return calculateDirection(station, destination, departureLine);
+    }
     if (direction) {
-      const terminus = direction === "up" ? "당고개" : "오이도";
-      return getDirectionFromTerminus(station, terminus);
+      // direction이 "up"/"down"일 때 호선별 종착역 lookup
+      // (2호선 순환은 direction "inner"/"outer"라 이 분기 안 거침)
+      const terminus = direction === "up" ? "당고개" : "오이도"; // 4호선 fallback
+      return getDirectionFromTerminus(station, terminus, departureLine);
     }
     return null;
-  }, [station, destination, direction]);
+  }, [station, destination, direction, departureLine]);
 
   // 헤더 타이틀 — 도착역 유무에 따라
   const headerTitle = destination
     ? `${station} → ${destination}`
     : `${station}${dirResult ? `, ${dirResult.directionText}` : ""}`;
+
+  /**
+   * 헤더 호선 뱃지 — 출발/도착 호선 모두 표시
+   * - 같은 호선 (예: 사당 2호선 → 강남 2호선) → [2호선] 1개
+   * - 환승 경로 (예: 노원 4호선 → 강남 2호선) → [4호선] [2호선] 2개
+   * - 도착역 없으면 출발 호선만
+   */
+  const tripLineKeys: LineKey[] = useMemo(() => {
+    const dep = departureLine as LineKey;
+    if (!destination || !destinationLine) return [dep];
+    const dst = destinationLine as LineKey;
+    return dep === dst ? [dep] : [dep, dst];
+  }, [departureLine, destination, destinationLine]);
 
   /**
    * 사용자 선택 방면에 대응하는 plfNo
@@ -103,10 +123,20 @@ export default function RecommendationScreen() {
   // 도착 정보 — 5초 폴링
   const arrivals = useArrivals(station);
 
-  // 방면 필터링 — 서울 API의 updnLine 사용 (이미 "상행"/"하행" 한글로 옴)
+  // 방면 필터링 — 서울 API의 updnLine 사용
+  // 호선별 라벨:
+  //   - 일반 호선(1/3/4/5/6/7/8/9): "상행"/"하행"
+  //   - 2호선 순환선: "내선"/"외선"
+  // direction 값 매핑:
+  //   "up" → "상행", "down" → "하행", "inner" → "내선", "outer" → "외선"
   const filteredArrivals = useMemo(() => {
     if (!dirResult) return arrivals.data;
-    const targetUpdn = dirResult.direction === "up" ? "상행" : "하행";
+    const targetUpdn =
+      dirResult.direction === "up" ? "상행" :
+      dirResult.direction === "down" ? "하행" :
+      dirResult.direction === "inner" ? "내선" :
+      dirResult.direction === "outer" ? "외선" :
+      "";
     return arrivals.data.filter((a) => a.updnLine === targetUpdn);
   }, [arrivals.data, dirResult]);
 
@@ -114,9 +144,11 @@ export default function RecommendationScreen() {
   const destInfo = destination ? getStationByName(destination) : undefined;
   const isDestinationTransfer = Boolean(destInfo?.isTransfer);
 
-  // 정거장 수 / 소요 시간
-  const stops = destination ? countStops(station, destination) : 0;
-  const travelMin = destination ? estimateTravelMinutes(station, destination) : 0;
+  // 정거장 수 / 소요 시간 (호선별)
+  const stops = destination ? countStops(station, destination, departureLine) : 0;
+  const travelMin = destination
+    ? estimateTravelMinutes(station, destination, departureLine)
+    : 0;
 
   // 즐겨찾기 추가 — Phase 1은 도착역 단순 즐겨찾기로 처리 (Phase 2에서 경로 즐겨찾기로 확장)
   const alreadyFav = destination ? isFavorite(destination) : false;
@@ -145,6 +177,10 @@ export default function RecommendationScreen() {
           <Text style={styles.resetText}>← 다시 고를래요</Text>
         </Pressable>
         <View style={styles.headerCenter}>
+          {/* 호선 뱃지 — 출발/도착 호선 같으면 1개, 다르면 환승 경로 2개 */}
+          <View style={styles.headerBadges}>
+            <LineBadges lines={tripLineKeys} variant="pill" />
+          </View>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {headerTitle}
           </Text>
@@ -160,7 +196,7 @@ export default function RecommendationScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 */}
-        {renderCongestionCard(congestion, selectedPlfNo, station)}
+        {renderCongestionCard(congestion, selectedPlfNo, station, departureLine as LineKey)}
 
         {/* 2. 경로 요약 (도착역 있을 때만) */}
         {destination && (
@@ -278,21 +314,28 @@ function renderArrivals(
 function renderCongestionCard(
   congestion: ReturnType<typeof useCongestion>,
   selectedPlfNo: 1 | 2 | null,
-  stationName: string
+  stationName: string,
+  departureLine: LineKey
 ) {
-  // 1) 미지원 역 (KORAIL/남양주) — KRIC stationCongestion에 데이터 없음
+  // 1) 미지원 — 호선별 친근 안내 분기
+  //    - 9호선: 9호선 전체 미지원
+  //    - 4호선 KORAIL/남양주: 안산선/과천선/진접 연장 구간
   if (congestion.isUnsupported) {
+    const isLine9 = departureLine === "9";
     return (
       <View style={styles.recoCard}>
         <Text style={styles.recoLabel}>혼잡도</Text>
         <View style={styles.unsupportedBox}>
-          <Text style={styles.unsupportedEmoji}>🤔</Text>
+          <Text style={styles.unsupportedEmoji}>😴</Text>
           <Text style={styles.unsupportedTitle}>
-            {stationName}역은 아직 혼잡도 데이터가 없어요
+            {isLine9
+              ? "9호선은 KRIC 데이터가 없어요"
+              : `${stationName}역은 아직 혼잡도 데이터가 없어요`}
           </Text>
           <Text style={styles.unsupportedDesc}>
-            서울교통공사 관할 구간(당고개~남태령)에서만 제공돼요.{"\n"}
-            안산선/과천선 데이터는 다른 출처에서 보강 예정이에요.
+            {isLine9
+              ? "자리잡이가 졸고 있어요 — 9호선 혼잡도는 조만간 추가될 예정이에요!\n도착 정보는 그대로 보여드릴게요."
+              : `서울교통공사 관할 구간에서만 제공돼요.\n다른 출처에서 보강 예정이에요.`}
           </Text>
         </View>
       </View>
@@ -453,6 +496,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   headerCenter: { flex: 1, alignItems: "center" },
+  headerBadges: { marginBottom: 4 }, // 호선 뱃지 row — 타이틀 위에 작게
   headerRightSpacer: { width: 88 }, // resetBtn 텍스트 폭과 비슷하게 — 중앙 타이틀 균형
   headerTitle: { ...typography.h3, color: colors.textPrimary, fontSize: 18 },
   headerSub: { ...typography.caption, color: colors.accent, marginTop: 2 },

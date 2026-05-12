@@ -1,9 +1,10 @@
 // 시티드 백엔드 서버 진입점
 //
-// ⚠️ 중요: ./config/env가 다른 모든 import보다 먼저 와야 한다.
-// 이유: TS/JS의 import는 호이스팅되어 본문 코드보다 먼저 평가된다.
-// 같은 파일 안에서는 import 문 사이 순서가 유지되므로,
-// .env 로드를 첫 import로 두면 이후 import되는 모듈들이 환경 변수를 안전하게 사용할 수 있다.
+// ⚠️ 중요: import 순서 보장 (호이스팅 안전)
+//   1. ./config/dns  ← DNS 서버 명시 (KT DNS SERVFAIL 우회) — 다른 어떤 import보다 먼저
+//   2. ./config/env  ← .env 로드
+//   3. 나머지 모듈들
+import "./config/dns";
 import "./config/env";
 
 import express from "express";

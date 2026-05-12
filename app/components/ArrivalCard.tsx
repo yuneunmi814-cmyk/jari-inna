@@ -65,7 +65,8 @@ function getDestination(trainLineNm: string): string {
 export default function ArrivalCard({ arrival }: Props) {
   const time = formatTime(arrival);
   const destination = getDestination(arrival.trainLineNm);
-  const directionLabel = arrival.updnLine === "상행" ? "상행" : "하행";
+  // 서울 API updnLine 그대로 표시 ("상행"/"하행"/"내선"/"외선")
+  const directionLabel = arrival.updnLine || "";
 
   return (
     <View style={styles.card}>

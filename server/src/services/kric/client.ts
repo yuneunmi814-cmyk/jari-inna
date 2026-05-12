@@ -12,9 +12,53 @@
 // process.env는 매번 새로 읽음 (import 호이스팅 안전, 어제 dataGoKr와 동일 패턴).
 
 import axios, { AxiosError } from "axios";
+import { promises as dnsPromises } from "dns";
+import https from "https";
 import iconv from "iconv-lite";
 
 const BASE_URL = "https://openapi.kric.go.kr/openapi";
+
+// ─────────────────────────────────────────────────────────────
+// DNS 우회: KT DNS가 openapi.kric.go.kr에 SERVFAIL 반환하는 이슈
+//
+// 전략: IP 직접 박기
+//   1. 자체 Resolver(Google DNS)로 IP 알아냄 → 30분 캐시
+//   2. axios URL의 hostname을 IP로 치환
+//   3. Host 헤더 + SNI(servername)에 진짜 호스트명 명시 → TLS 인증서 정상 검증
+//
+// custom lookup 옵션은 Node 버전에 따라 동작 불안정 → IP 직접 박는 게 가장 robust.
+// ─────────────────────────────────────────────────────────────
+
+const KRIC_HOSTNAME = "openapi.kric.go.kr";
+
+const kricResolver = new dnsPromises.Resolver();
+kricResolver.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4", "1.0.0.1"]);
+
+/** 30분 메모리 캐시 */
+let kricIpCache: { ip: string; expiresAt: number } | null = null;
+
+/** Google DNS로 KRIC IP 알아내기 (캐시 적용) */
+async function getKricIp(): Promise<string> {
+  if (kricIpCache && kricIpCache.expiresAt > Date.now()) {
+    return kricIpCache.ip;
+  }
+  const addresses = await kricResolver.resolve4(KRIC_HOSTNAME);
+  if (!addresses || addresses.length === 0) {
+    throw new Error(`No A record for ${KRIC_HOSTNAME}`);
+  }
+  kricIpCache = {
+    ip: addresses[0],
+    expiresAt: Date.now() + 30 * 60 * 1000,
+  };
+  console.log(`[kric/dns] ${KRIC_HOSTNAME} → ${addresses[0]} (Google DNS, 30분 캐시)`);
+  return addresses[0];
+}
+
+/** SNI를 진짜 호스트명으로 명시하는 https.Agent (IP 직접 박을 때 인증서 검증) */
+const kricHttpsAgent = new https.Agent({
+  servername: KRIC_HOSTNAME,
+  keepAlive: true,
+});
 
 /**
  * API 식별자 → 호출 메타 매핑
@@ -169,9 +213,15 @@ export async function callKric<T = any>(
   // HTTP 호출
   let response;
   try {
-    response = await axios.get(fullUrl, {
+    // KT DNS SERVFAIL 우회: IP 직접 박고 Host 헤더 + SNI(servername) 명시
+    const kricIp = await getKricIp();
+    const ipUrl = fullUrl.replace(KRIC_HOSTNAME, kricIp);
+
+    response = await axios.get(ipUrl, {
       timeout: 10000,
       responseType: "arraybuffer",
+      headers: { Host: KRIC_HOSTNAME },
+      httpsAgent: kricHttpsAgent,
     });
   } catch (err) {
     const ae = err as AxiosError;
