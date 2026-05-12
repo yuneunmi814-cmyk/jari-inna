@@ -33,13 +33,29 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, "Favorites">;
 
 export default function FavoritesScreen() {
   const navigation = useNavigation<NavProp>();
-  const { station, destination, setTrip } = useStation();
+  const {
+    station,
+    departureLine,
+    destination,
+    destinationLine,
+    setTrip,
+  } = useStation();
   const { routes, addRoute, removeRoute } = useRouteFavorites();
   const [modalVisible, setModalVisible] = useState(false);
 
-  /** 카드 탭 → 출발/도착 적용 + 홈으로 */
-  const handleUseRoute = (departure: string, dest: string) => {
-    setTrip(departure, dest);
+  /** 카드 탭 → 출발/도착 + 호선 적용 + 홈으로 (마이그레이션: 호선 없으면 '4') */
+  const handleUseRoute = (
+    departure: string,
+    dest: string,
+    depLine?: string,
+    dstLine?: string
+  ) => {
+    setTrip(
+      departure,
+      dest,
+      (depLine as any) ?? "4",
+      (dstLine as any) ?? "4"
+    );
     navigation.navigate("Home");
   };
 
@@ -106,7 +122,14 @@ export default function FavoritesScreen() {
           renderItem={({ item }) => (
             <FavoriteRouteCard
               route={item}
-              onUse={() => handleUseRoute(item.departure, item.destination)}
+              onUse={() =>
+                handleUseRoute(
+                  item.departure,
+                  item.destination,
+                  item.departureLine,
+                  item.destinationLine
+                )
+              }
               onDelete={() => handleDelete(item.id, item.label)}
             />
           )}
@@ -132,7 +155,12 @@ export default function FavoritesScreen() {
         destination={destination ?? ""}
         onCancel={() => setModalVisible(false)}
         onSubmit={async (input) => {
-          await addRoute(input);
+          // 현재 Context의 호선코드를 함께 저장
+          await addRoute({
+            ...input,
+            departureLine,
+            destinationLine: destinationLine ?? "4",
+          });
           setModalVisible(false);
         }}
       />

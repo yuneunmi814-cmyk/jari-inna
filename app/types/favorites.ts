@@ -8,7 +8,12 @@
 
 /**
  * 사용자가 등록한 자주 가는 경로 1개
- * 예: { label: "출근", icon: "🏠", departure: "사당", destination: "강남", ... }
+ * 예: { label: "출근", icon: "🏠", departure: "사당", departureLine: "4",
+ *      destination: "강남", destinationLine: "2", ... }
+ *
+ * ⚠️ 마이그레이션: lineCode 필드는 B2 이후 추가됨.
+ *   기존 즐겨찾기에 lineCode 없으면 자동으로 '4' (4호선 기본) 적용.
+ *   FavoritesScreen / QuickStartSection 사용처에서 fallback 처리.
  */
 export interface FavoriteRoute {
   id: string;          // 고유 ID (timestamp + random)
@@ -16,11 +21,16 @@ export interface FavoriteRoute {
   icon: string;        // 이모지 1개 (🏠 💼 ⭐ ❤️ 🚇 🎯 등)
   departure: string;   // 출발역 이름 (예: "사당")
   destination: string; // 도착역 이름 (예: "강남")
+  /** 출발역 호선 — B2 이후 추가. 옛 데이터는 없으면 '4'로 fallback. */
+  departureLine?: string;
+  /** 도착역 호선 */
+  destinationLine?: string;
   createdAt: number;   // 생성 시각 (정렬용)
 }
 
 /**
  * 새 경로 추가 시 사용자가 입력하는 필드 (id, createdAt은 자동 생성)
+ * departureLine/destinationLine은 optional — addRoute 호출 시 자동 채워짐.
  */
 export type NewFavoriteRoute = Omit<FavoriteRoute, "id" | "createdAt">;
 

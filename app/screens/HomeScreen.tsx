@@ -50,7 +50,9 @@ export default function HomeScreen() {
   const navigation = useNavigation<NavProp>();
   const {
     station,
+    departureLine,
     destination,
+    destinationLine,
     direction,
     setDestination,
     setDirection,
@@ -110,10 +112,17 @@ export default function HomeScreen() {
         {/* 1. 헤더 */}
         <Header />
 
-        {/* 1.5 ⚡ 빠른 출발 — 즐겨찾기 1탭 사용 */}
+        {/* 1.5 ⚡ 빠른 출발 — 즐겨찾기 1탭 사용 (호선 lineCode 함께 복원) */}
         <QuickStartSection
           routes={favRoutes}
-          onUseRoute={(r) => setTrip(r.departure, r.destination)}
+          onUseRoute={(r) =>
+            setTrip(
+              r.departure,
+              r.destination,
+              (r.departureLine as any) ?? "4",
+              (r.destinationLine as any) ?? "4"
+            )
+          }
           onAddNew={() => navigation.navigate("Favorites")}
         />
 
@@ -215,14 +224,19 @@ export default function HomeScreen() {
         <View style={styles.footerSpacer} />
       </ScrollView>
 
-      {/* 경로 즐겨찾기 추가 모달 — 출발/도착 prefill */}
+      {/* 경로 즐겨찾기 추가 모달 — 출발/도착 + 호선 prefill */}
       <AddFavoriteModal
         visible={favModalVisible}
         departure={station}
         destination={destination ?? ""}
         onCancel={() => setFavModalVisible(false)}
         onSubmit={async (input) => {
-          await addRoute(input);
+          // 현재 Context의 호선코드를 함께 저장 (마이그레이션 호환)
+          await addRoute({
+            ...input,
+            departureLine,
+            destinationLine: destinationLine ?? "4",
+          });
           setFavModalVisible(false);
         }}
       />

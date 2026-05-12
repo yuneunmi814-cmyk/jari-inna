@@ -6,15 +6,23 @@
 
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { LineKey } from "../constants/lines";
 import { colors } from "../theme/colors";
 import { radius, spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+import LineBadges from "./LineBadges";
 
 interface Props {
   name: string;
   isTransfer?: boolean;
   isCurrent?: boolean;
   isFavorite?: boolean;
+  /**
+   * 이 역이 속한 호선들 (LineBadges 표시용).
+   * 단일 호선 = [그 호선], 환승역 = 여러 호선.
+   * 생략 시 기존 "환승" 텍스트 뱃지 fallback (backward compatible).
+   */
+  lines?: LineKey[];
   /** 비활성 표시 — 예: 도착역 선택 모드에서 출발역과 같은 역 */
   disabled?: boolean;
   /** 비활성 사유 우측에 표시 (예: "출발역") */
@@ -28,6 +36,7 @@ export default function StationListItem({
   isTransfer,
   isCurrent,
   isFavorite,
+  lines,
   disabled,
   disabledHint,
   onPress,
@@ -54,11 +63,16 @@ export default function StationListItem({
         >
           {name}
         </Text>
-        {isTransfer && (
+        {/* 호선 뱃지 — lines prop 우선, 없으면 기존 "환승" 텍스트 fallback */}
+        {lines && lines.length > 0 ? (
+          <View style={styles.lineBadges}>
+            <LineBadges lines={lines} variant="badge" />
+          </View>
+        ) : isTransfer ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>환승</Text>
           </View>
-        )}
+        ) : null}
         {isCurrent && <Text style={styles.currentDot}>·</Text>}
         {isCurrent && <Text style={styles.currentLabel}>현재</Text>}
         {disabled && disabledHint && (
@@ -99,7 +113,11 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     marginLeft: spacing.sm,
   },
-  // 환승 뱃지 — 4호선 노선 컬러 (호선 표시)
+  // 호선 뱃지 그룹 컨테이너 (LineBadges 좌측 여유)
+  lineBadges: {
+    marginLeft: spacing.sm,
+  },
+  // 기존 "환승" 텍스트 뱃지 fallback (lines 미전달 시)
   badge: {
     marginLeft: spacing.sm,
     paddingHorizontal: spacing.sm,

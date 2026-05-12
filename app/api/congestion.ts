@@ -90,15 +90,10 @@ export async function getCongestionByStation(
 }
 
 /**
- * 혼잡도 데이터가 이 역에 제공되는지 여부 (UI에서 사전 체크용 — 옵션)
- * 현재는 호출해보는 게 가장 정확. 차후 lookup 테이블 추가 가능.
+ * 혼잡도 데이터가 이 역에 제공되는지 여부 (UI에서 사전 체크용)
+ * 1~8호선 서울교통공사 245개 역만 KRIC stationCongestion 지원.
+ * 9호선(서울메트로9) + 4호선 KORAIL/남양주 구간은 미지원.
+ *
+ * 데이터 소스: constants/lines.ts의 자동 생성 Set.
  */
-export function isCongestionSupportedStation(stationName: string): boolean {
-  // Phase 1: 서울교통공사 26개 역만 KRIC stationCongestion에 데이터 있음
-  const supported = new Set([
-    "당고개","상계","노원","창동","쌍문","수유","미아","미아사거리","길음",
-    "성신여대입구","한성대입구","혜화","동대문","동대문역사문화공원","충무로",
-    "명동","회현","서울역","숙대입구","삼각지","신용산","이촌","동작","이수","사당","남태령",
-  ]);
-  return supported.has(stationName.trim());
-}
+export { isCongestionSupported as isCongestionSupportedStation } from "../constants/lines";

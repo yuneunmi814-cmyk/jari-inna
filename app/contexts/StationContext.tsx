@@ -1,48 +1,63 @@
-// 선택된 출발역 / 도착역 / 방면을 전역으로 관리
+// 선택된 출발역 / 도착역 / 방면 / 호선코드를 전역으로 관리
 //
 // 필드 의미:
-//   - station         : 출발역 (기존 호환 유지, 향후 departureStation으로 점진적 마이그레이션 검토)
-//   - destination     : 도착역 (선택사항). 선택 시 방면 자동 계산.
-//   - direction       : 사용자가 직접 고른 방면 ("up"=당고개행, "down"=오이도행).
-//                       destination이 있으면 direction은 무시되고 destination 기반 계산이 우선.
+//   - station          : 출발역 (영속화됨)
+//   - departureLine    : 출발역 호선 ('1'~'9', 기본 '4'). 환승역은 사용자가 모달에서 선택.
+//   - destination      : 도착역 (세션 한정)
+//   - destinationLine  : 도착역 호선 (세션 한정)
+//   - direction        : 사용자가 직접 고른 방면. destination이 있으면 무시.
 //
-// 영속화:
-//   - station만 AsyncStorage 저장. destination/direction은 세션 한정(앱 재시작 시 초기화).
-//   - 출발역은 거의 동일하지만 도착역은 그때그때 다름 — 매번 새로 선택하는 게 자연스러움.
+// AsyncStorage:
+//   - station, departureLine 둘 다 영속화 (앱 재시작 시 복원)
+//   - destination/destinationLine/direction은 세션 한정
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import type { LineKey } from "../constants/lines";
 import type { Direction } from "../utils/directionCalculator";
 
-const STORAGE_KEY = "@jari-inna/selected-station";
+const STORAGE_STATION = "@jari-inna/selected-station";
+const STORAGE_DEP_LINE = "@jari-inna/departure-line";
 const DEFAULT_STATION = "사당";
+const DEFAULT_LINE: LineKey = "4";
 
 type StationContextValue = {
-  /** 출발역 (영속화됨) */
+  /** 출발역 (영속화) */
   station: string;
-  setStation: (name: string) => void;
+  /** 출발역 호선 (영속화, 기본 '4') */
+  departureLine: LineKey;
+  /** 출발역을 변경. lineCode를 함께 명시 가능 (환승역 모달에서 사용) */
+  setStation: (name: string, lineCode?: LineKey) => void;
+  /** 출발역 호선만 단독으로 변경 */
+  setDepartureLine: (ln: LineKey) => void;
 
   /** 도착역 (세션 한정) */
   destination: string | null;
-  setDestination: (name: string | null) => void;
+  destinationLine: LineKey | null;
+  setDestination: (name: string | null, lineCode?: LineKey) => void;
+  setDestinationLine: (ln: LineKey | null) => void;
 
-  /** 직접 선택한 방면 (도착역 없을 때만 의미 있음) */
+  /** 직접 선택한 방면 (도착역 없을 때만 의미) */
   direction: Direction | null;
   setDirection: (d: Direction | null) => void;
 
-  /** 도착역/방면 한꺼번에 리셋 — "다시 고를래요" 같은 경우 */
+  /** 도착역/방면 한꺼번에 리셋 */
   resetTrip: () => void;
 
-  /** 출발역 ↔ 도착역 한 번에 swap (도착역 있을 때만 의미) */
+  /** 출발 ↔ 도착 swap (호선도 함께 교환) */
   swapStations: () => void;
 
   /**
-   * 출발 + 도착을 한 번에 set (경로 즐겨찾기 적용 시 사용)
-   * setStation의 부작용(도착/방면 null)을 회피하면서 둘 다 set
+   * 출발 + 도착 + 호선을 한 번에 set (경로 즐겨찾기 적용 시).
+   * lineCode 생략 시 default '4' (기존 즐겨찾기 자동 마이그레이션).
    */
-  setTrip: (departure: string, destination: string) => void;
+  setTrip: (
+    departure: string,
+    destination: string,
+    departureLine?: LineKey,
+    destinationLine?: LineKey
+  ) => void;
 
-  /** AsyncStorage 로드 완료 여부 */
   ready: boolean;
 };
 
@@ -50,85 +65,124 @@ const StationContext = createContext<StationContextValue | null>(null);
 
 export function StationProvider({ children }: { children: React.ReactNode }) {
   const [station, setStationState] = useState<string>(DEFAULT_STATION);
+  const [departureLine, setDepartureLineState] = useState<LineKey>(DEFAULT_LINE);
   const [destination, setDestinationState] = useState<string | null>(null);
+  const [destinationLine, setDestinationLineState] = useState<LineKey | null>(null);
   const [direction, setDirectionState] = useState<Direction | null>(null);
   const [ready, setReady] = useState(false);
 
-  // 앱 시작 시 저장된 출발역 복원
+  // 앱 시작 시 저장된 출발역 + 호선 복원
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((saved) => {
-        if (saved && saved.trim()) setStationState(saved);
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_STATION),
+      AsyncStorage.getItem(STORAGE_DEP_LINE),
+    ])
+      .then(([savedStation, savedLine]) => {
+        if (savedStation && savedStation.trim()) {
+          setStationState(savedStation);
+        }
+        if (savedLine && /^[1-9]$/.test(savedLine)) {
+          setDepartureLineState(savedLine as LineKey);
+        }
+        console.log("[StationContext] 복원:", { savedStation, savedLine });
       })
-      .catch(() => {
-        // 저장소 에러는 무시 (기본값 사용)
-      })
+      .catch(() => {})
       .finally(() => setReady(true));
   }, []);
 
-  const setStation = (name: string) => {
+  const setStation = (name: string, lineCode?: LineKey) => {
+    const ln = lineCode ?? DEFAULT_LINE;
+    console.log("[StationContext] setStation:", { name, lineCode: ln });
     setStationState(name);
-    // 출발역이 바뀌면 기존 도착역/방면 조합이 깨질 수 있어 함께 초기화
+    setDepartureLineState(ln);
+    // 출발역 바뀌면 도착/방면 reset
     setDestinationState(null);
+    setDestinationLineState(null);
     setDirectionState(null);
-    AsyncStorage.setItem(STORAGE_KEY, name).catch(() => {});
+    AsyncStorage.setItem(STORAGE_STATION, name).catch(() => {});
+    AsyncStorage.setItem(STORAGE_DEP_LINE, ln).catch(() => {});
   };
 
-  /**
-   * 도착역 설정 — 도착역이 정해지면 사용자가 직접 고른 방면은 더 이상 필요 없음
-   */
-  const setDestination = (name: string | null) => {
+  const setDepartureLine = (ln: LineKey) => {
+    console.log("[StationContext] setDepartureLine:", ln);
+    setDepartureLineState(ln);
+    AsyncStorage.setItem(STORAGE_DEP_LINE, ln).catch(() => {});
+  };
+
+  const setDestination = (name: string | null, lineCode?: LineKey) => {
+    console.log("[StationContext] setDestination:", { name, lineCode });
     setDestinationState(name);
+    setDestinationLineState(name ? (lineCode ?? DEFAULT_LINE) : null);
     if (name) setDirectionState(null); // 도착역 우선
   };
 
-  /**
-   * 방면 직접 선택 — 도착역 모르는 상태에서 "그냥 당고개 방면 열차 알려줘" 시나리오
-   */
+  const setDestinationLine = (ln: LineKey | null) => {
+    setDestinationLineState(ln);
+  };
+
   const setDirection = (d: Direction | null) => {
     setDirectionState(d);
-    if (d) setDestinationState(null); // 둘 중 하나만 활성
+    if (d) setDestinationState(null);
   };
 
   const resetTrip = () => {
     setDestinationState(null);
+    setDestinationLineState(null);
     setDirectionState(null);
   };
 
   /**
-   * 출발 + 도착을 한 번에 set (경로 즐겨찾기 적용 시 사용)
-   * setStation 호출 시 도착/방면을 null로 만드는 부작용을 회피.
+   * 출발 + 도착 + 호선을 한 번에 set
+   * setStation의 reset 부작용 회피, 양쪽 state 직접 set
    */
-  const setTrip = (departure: string, destination: string) => {
-    setStationState(departure);
-    setDestinationState(destination);
-    setDirectionState(null); // 방면은 새 페어로 자동 재계산
-    AsyncStorage.setItem(STORAGE_KEY, departure).catch(() => {});
-  };
-
-  /**
-   * 출발역 ↔ 도착역 동시 교환
-   * setStation의 초기화 부작용(도착역/방면 null)을 피하기 위해
-   * 내부 state를 직접 set하고 AsyncStorage만 수동 갱신.
-   * 방면은 새 출발/도착 페어로 자동 재계산되므로 null로 둠.
-   */
-  const swapStations = () => {
-    if (!destination) return; // 도착역 없으면 swap 의미 없음
-    const newDeparture = destination;
-    const newDestination = station;
+  const setTrip = (
+    newDeparture: string,
+    newDestination: string,
+    newDepartureLine?: LineKey,
+    newDestinationLine?: LineKey
+  ) => {
+    const depLn = newDepartureLine ?? DEFAULT_LINE;
+    const dstLn = newDestinationLine ?? DEFAULT_LINE;
+    console.log("[StationContext] setTrip:", {
+      newDeparture, newDestination, depLn, dstLn,
+    });
     setStationState(newDeparture);
+    setDepartureLineState(depLn);
     setDestinationState(newDestination);
+    setDestinationLineState(dstLn);
     setDirectionState(null);
-    AsyncStorage.setItem(STORAGE_KEY, newDeparture).catch(() => {});
+    AsyncStorage.setItem(STORAGE_STATION, newDeparture).catch(() => {});
+    AsyncStorage.setItem(STORAGE_DEP_LINE, depLn).catch(() => {});
+  };
+
+  /** 출발 ↔ 도착 swap (호선도 함께) */
+  const swapStations = () => {
+    if (!destination) return;
+    const newDep = destination;
+    const newDst = station;
+    const newDepLn = destinationLine ?? DEFAULT_LINE;
+    const newDstLn = departureLine;
+    console.log("[StationContext] swapStations");
+    setStationState(newDep);
+    setDepartureLineState(newDepLn);
+    setDestinationState(newDst);
+    setDestinationLineState(newDstLn);
+    setDirectionState(null);
+    AsyncStorage.setItem(STORAGE_STATION, newDep).catch(() => {});
+    AsyncStorage.setItem(STORAGE_DEP_LINE, newDepLn).catch(() => {});
   };
 
   return (
     <StationContext.Provider
       value={{
         station,
+        departureLine,
         setStation,
+        setDepartureLine,
         destination,
+        destinationLine,
         setDestination,
+        setDestinationLine,
         direction,
         setDirection,
         resetTrip,
