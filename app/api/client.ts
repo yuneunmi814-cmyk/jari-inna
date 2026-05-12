@@ -1,16 +1,39 @@
 // 백엔드 API 클라이언트
 // EXPO_PUBLIC_API_URL 환경 변수에서 base URL을 읽어 axios 인스턴스 생성
 // 친근한 한국어 에러 메시지로 변환해서 화면에 그대로 보여줄 수 있게 함
+//
+// IP 변경 안전망 (Web 한정):
+//   .env에 박힌 192.168.x.x IP가 DHCP 갱신으로 바뀌어도 web 빌드는 안 깨지게,
+//   web 환경에선 IP를 자동으로 'localhost'로 치환.
+//   (Expo Go 모바일은 다른 디바이스라 localhost로는 못 닿음 → IP 그대로 사용)
 
 import axios, { AxiosError } from "axios";
+import { Platform } from "react-native";
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+const RAW = process.env.EXPO_PUBLIC_API_URL ?? "";
+
+/**
+ * 웹은 같은 머신에서 도니까 IP → localhost 자동 치환.
+ * 모바일(iOS/Android)은 별도 디바이스라 IP 보존.
+ */
+function resolveBaseURL(raw: string): string {
+  if (!raw) return raw;
+  if (Platform.OS === "web") {
+    return raw.replace(/\/\/(\d+\.\d+\.\d+\.\d+)/, "//localhost");
+  }
+  return raw;
+}
+
+const BASE_URL = resolveBaseURL(RAW);
 
 if (!BASE_URL) {
-  // 개발 환경 안내 — 빌드 시점에 미설정이면 콘솔에 경고
   console.warn(
     "[api/client] EXPO_PUBLIC_API_URL이 설정되지 않았습니다. " +
       "app/.env 파일에 EXPO_PUBLIC_API_URL=http://본인IP:3000 을 추가하세요."
+  );
+} else if (Platform.OS === "web" && BASE_URL !== RAW) {
+  console.log(
+    `[api/client] Web 환경 감지 — IP를 localhost로 치환: ${RAW} → ${BASE_URL}`
   );
 }
 

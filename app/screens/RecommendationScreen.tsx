@@ -15,7 +15,7 @@
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,8 @@ import { getStationByName } from "../constants/line4Stations";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
+import { useCongestion } from "../hooks/useCongestion";
+import type { CongestionLevel } from "../api/congestion";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
 import { shadows } from "../theme/shadows";
@@ -45,10 +47,16 @@ import {
   getDirectionFromTerminus,
   type DirectionResult,
 } from "../utils/directionCalculator";
-import {
-  congestionColorKey,
-  recommendSeat,
-} from "../utils/seatRecommender";
+
+/**
+ * 혼잡도 레벨 → 화면 색상 키
+ * very_low/low → success(녹), medium → warning(주황), high/very_high → danger(빨)
+ */
+function congestionColor(level: CongestionLevel): "success" | "warning" | "danger" {
+  if (level === "very_low" || level === "low") return "success";
+  if (level === "medium") return "warning";
+  return "danger";
+}
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Recommendation">;
 
@@ -57,8 +65,8 @@ export default function RecommendationScreen() {
   const { station, destination, direction, resetTrip } = useStation();
   const { addFavorite, isFavorite } = useFavorites();
 
-  // 추천 칸 새로고침 카운터 — 사용자가 ↻ 누를 때마다 증가 → 다른 칸/혼잡도 추천
-  const [seatNonce, setSeatNonce] = useState(0);
+  // 출발역 혼잡도 — KRIC stationCongestion (분기별 시간대 평균)
+  const congestion = useCongestion(station);
 
   // 방면 정보 결정: 도착역 있으면 우선, 없으면 사용자가 고른 방면
   const dirResult: DirectionResult | null = useMemo(() => {
@@ -75,15 +83,16 @@ export default function RecommendationScreen() {
     ? `${station} → ${destination}`
     : `${station}${dirResult ? `, ${dirResult.directionText}` : ""}`;
 
-  // 추천 칸 — 출발역 + 시간 + nonce 기반 더미
-  // nonce 변경 시(새로고침 버튼) 다른 결과 도출
-  const recommendation = useMemo(
-    () => recommendSeat(station, new Date().getHours(), seatNonce),
-    [station, seatNonce]
-  );
-
-  /** 새로 추천받기 — 시각적 피드백 위해 nonce 증가 */
-  const handleRerollSeat = () => setSeatNonce((n) => n + 1);
+  /**
+   * 사용자 선택 방면에 대응하는 plfNo
+   *   - up(상행) = plfNo 1
+   *   - down(하행) = plfNo 2
+   * (사당역 platform 응답 검증된 매핑. 다른 역도 동일 가정)
+   */
+  const selectedPlfNo = useMemo<1 | 2 | null>(() => {
+    if (!dirResult) return null;
+    return dirResult.direction === "up" ? 1 : 2;
+  }, [dirResult]);
 
   /** 다시 고를래요 — 도착역/방면 모두 초기화 + 홈으로 돌아가기 */
   const handleResetTrip = () => {
@@ -124,8 +133,6 @@ export default function RecommendationScreen() {
     Alert.alert("추가됨", `'${destination}'을(를) 즐겨찾기에 추가했어요`);
   };
 
-  const congKey = congestionColorKey(recommendation.congestion);
-
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       {/* 헤더 — 좌측 "다시 고를래요"는 resetTrip + 홈으로 */}
@@ -152,47 +159,8 @@ export default function RecommendationScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. 추천 탑승 칸 카드 */}
-        <View style={styles.recoCard}>
-          <View style={styles.recoHeader}>
-            <Text style={styles.recoLabel}>추천 탑승 칸</Text>
-            <Pressable
-              onPress={handleRerollSeat}
-              hitSlop={10}
-              style={({ pressed }) => [styles.rerollBtn, pressed && { opacity: 0.5 }]}
-            >
-              <Text style={styles.rerollIcon}>↻</Text>
-              <Text style={styles.rerollText}>다시 추천</Text>
-            </Pressable>
-          </View>
-          <View style={styles.recoMain}>
-            <Text style={styles.carEmoji}>🚇</Text>
-            <View style={styles.recoTextBlock}>
-              <Text style={styles.carNumber}>
-                {recommendation.carNo}호차
-              </Text>
-              <View style={styles.congestionRow}>
-                <View
-                  style={[
-                    styles.congestionDot,
-                    { backgroundColor: colors[congKey] },
-                  ]}
-                />
-                <Text
-                  style={[styles.congestionLabel, { color: colors[congKey] }]}
-                >
-                  {recommendation.congestionLabel}
-                </Text>
-              </View>
-              <Text style={styles.recoTip}>💡 {recommendation.tip}</Text>
-            </View>
-          </View>
-          <View style={styles.disclosure}>
-            <Text style={styles.disclosureText}>
-              Phase 2에 진짜 혼잡도 데이터가 들어와요
-            </Text>
-          </View>
-        </View>
+        {/* 1. 혼잡도 카드 — KRIC 분기별 시간대 평균 */}
+        {renderCongestionCard(congestion, selectedPlfNo, station)}
 
         {/* 2. 경로 요약 (도착역 있을 때만) */}
         {destination && (
@@ -302,6 +270,169 @@ function renderArrivals(
   );
 }
 
+/**
+ * 혼잡도 카드 렌더링
+ * - 로딩 / 미지원(KORAIL/남양주) / 에러 / 정상 4가지 상태
+ * - 정상: 사용자가 선택한 방면 + 반대 방면 둘 다 표시, 추천 메시지 강조
+ */
+function renderCongestionCard(
+  congestion: ReturnType<typeof useCongestion>,
+  selectedPlfNo: 1 | 2 | null,
+  stationName: string
+) {
+  // 1) 미지원 역 (KORAIL/남양주) — KRIC stationCongestion에 데이터 없음
+  if (congestion.isUnsupported) {
+    return (
+      <View style={styles.recoCard}>
+        <Text style={styles.recoLabel}>혼잡도</Text>
+        <View style={styles.unsupportedBox}>
+          <Text style={styles.unsupportedEmoji}>🤔</Text>
+          <Text style={styles.unsupportedTitle}>
+            {stationName}역은 아직 혼잡도 데이터가 없어요
+          </Text>
+          <Text style={styles.unsupportedDesc}>
+            서울교통공사 관할 구간(당고개~남태령)에서만 제공돼요.{"\n"}
+            안산선/과천선 데이터는 다른 출처에서 보강 예정이에요.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 2) 로딩
+  if (congestion.loading) {
+    return (
+      <View style={styles.recoCard}>
+        <View style={styles.loadingBox}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={styles.loadingText}>혼잡도 가져오는 중...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 3) 에러
+  if (congestion.error || !congestion.data) {
+    return (
+      <View style={styles.recoCard}>
+        <Text style={styles.recoLabel}>혼잡도</Text>
+        <View style={styles.unsupportedBox}>
+          <Text style={styles.unsupportedEmoji}>😅</Text>
+          <Text style={styles.unsupportedTitle}>
+            {congestion.error ?? "혼잡도를 가져오지 못했어요"}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 4) 정상 — KRIC 데이터 표시
+  const data = congestion.data;
+  const cur = data.current;
+  const selected = selectedPlfNo
+    ? cur.directions.find((d) => d.plfNo === selectedPlfNo)
+    : null;
+  const other = selected
+    ? cur.directions.find((d) => d.plfNo !== selected.plfNo)
+    : null;
+
+  // 추천 메시지 — 사용자가 선택한 방면이 추천 방면과 다를 때만 노출
+  // (백엔드가 이미 "stinLofa 차이가 있을 때만" recommended를 채워주므로
+  //  여기선 사용자 선택과 다른지만 확인하면 충분)
+  const showRecommendHint = !!(
+    cur.recommended &&
+    selected &&
+    cur.recommended.plfNo !== selected.plfNo
+  );
+
+  return (
+    <View style={styles.recoCard}>
+      <View style={styles.recoHeader}>
+        <Text style={styles.recoLabel}>
+          {cur.hourLabel} ({cur.time}) 혼잡도
+        </Text>
+      </View>
+
+      {/* 사용자 선택 방면 — 큰 강조 */}
+      {selected ? (
+        <View style={styles.directionBig}>
+          <Text style={styles.bigStation}>🚇 {stationName}</Text>
+          <Text style={styles.bigDirection}>
+            {selected.directionLabel}
+            <Text style={styles.bigDirectionFaded}>  (내가 갈 방향)</Text>
+          </Text>
+          <View style={styles.congestionRow}>
+            <View
+              style={[
+                styles.congestionDot,
+                { backgroundColor: colors[congestionColor(selected.level)] },
+              ]}
+            />
+            <Text
+              style={[
+                styles.congestionLabel,
+                { color: colors[congestionColor(selected.level)] },
+              ]}
+            >
+              {selected.label}
+            </Text>
+            <Text style={styles.lofaValue}> · {Math.round(selected.stinLofa)}</Text>
+          </View>
+        </View>
+      ) : (
+        // 방면 미선택 — 두 방면을 동등하게
+        <Text style={styles.recoTip}>
+          방면을 골라야 혼잡도를 더 정확히 볼 수 있어요
+        </Text>
+      )}
+
+      {/* 반대 방면 (참고) */}
+      {other && (
+        <View style={styles.directionSmall}>
+          <Text style={styles.smallLabel}>
+            {other.directionLabel} (반대 방면)
+          </Text>
+          <View style={styles.congestionRowSmall}>
+            <View
+              style={[
+                styles.congestionDotSmall,
+                { backgroundColor: colors[congestionColor(other.level)] },
+              ]}
+            />
+            <Text
+              style={[
+                styles.smallCongestionLabel,
+                { color: colors[congestionColor(other.level)] },
+              ]}
+            >
+              {other.label}
+            </Text>
+            <Text style={styles.lofaValueSmall}>
+              {" "}· {Math.round(other.stinLofa)}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* 추천 메시지 — 사용자 선택보다 추천이 더 한산할 때 */}
+      {showRecommendHint && cur.recommended && (
+        <View style={styles.recommendHint}>
+          <Text style={styles.recommendHintText}>
+            💡 {cur.recommended.reason}
+          </Text>
+        </View>
+      )}
+
+      {/* Disclosure — 데이터 출처 */}
+      <View style={styles.disclosure}>
+        <Text style={styles.disclosureText}>
+          KRIC {data.quarter} 평균 데이터예요
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
 
@@ -339,6 +470,112 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
+  },
+
+  // 사용자 선택 방면 — 강조 영역
+  directionBig: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+  },
+  bigStation: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  bigDirection: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 22,
+    marginBottom: spacing.sm,
+  },
+  bigDirectionFaded: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: "400",
+  },
+  lofaValue: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    fontWeight: "500",
+  },
+
+  // 반대 방면 — 작게 참고
+  directionSmall: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  smallLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  congestionRowSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  congestionDotSmall: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: spacing.sm,
+  },
+  smallCongestionLabel: {
+    ...typography.body,
+    fontWeight: "600",
+  },
+  lofaValueSmall: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+
+  // 추천 메시지
+  recommendHint: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  recommendHintText: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: "600",
+  },
+
+  // 미지원 / 에러 박스
+  unsupportedBox: {
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+    alignItems: "center",
+  },
+  unsupportedEmoji: {
+    fontSize: 36,
+    marginBottom: spacing.sm,
+  },
+  unsupportedTitle: {
+    ...typography.bodyLg,
+    color: colors.textPrimary,
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: spacing.xs,
+  },
+  unsupportedDesc: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
   },
   recoHeader: {
     flexDirection: "row",
