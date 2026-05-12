@@ -13,9 +13,11 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.paenda.seated"
     },
     "android": {
+      "package": "com.paenda.seated",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/jarijabi-icon.png",
         "backgroundColor": "#FFFFFF"
