@@ -10,6 +10,7 @@ import express from "express";
 import cors from "cors";
 import metroRouter from "./routes/metro";
 import debugRouter from "./routes/debug";
+import congestionRouter from "./routes/congestion";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -33,6 +34,9 @@ app.get("/health", (_req, res) => {
 
 // 지하철 API 라우트
 app.use("/api/metro", metroRouter);
+
+// 혼잡도 API 라우트 (KRIC stationCongestion 정규화)
+app.use("/api/congestion", congestionRouter);
 
 // 디버그 라우트 (개발 단계 전용) — Phase 통합 끝나면 제거 예정
 app.use("/debug", debugRouter);

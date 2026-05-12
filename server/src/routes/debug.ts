@@ -8,8 +8,94 @@ import {
   todayYYYYMMDD,
   yesterdayYYYYMMDD,
 } from "../services/dataGoKr";
+import { callKric, KRIC_APIS, type KricApiId } from "../services/kric/client";
+import { getStationCongestionRaw } from "../services/kric/stationCongestion";
 
 const router = Router();
+
+// ─────────────────────────────────────────────────────────────────
+// KRIC (레일포털) 디버그 라우트 — raw 응답 구조 확인용
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * GET /debug/kric/keys
+ * 8개 키 SET/UNSET 상태 일괄 확인 — 환경 변수 진단
+ */
+router.get("/kric/keys", (_req, res) => {
+  const status = (Object.entries(KRIC_APIS) as [KricApiId, typeof KRIC_APIS[KricApiId]][])
+    .map(([id, meta]) => ({
+      apiId: id,
+      label: meta.label,
+      envName: meta.keyEnv,
+      isSet: Boolean(process.env[meta.keyEnv]?.trim()),
+    }));
+  const total = status.length;
+  const setCount = status.filter((s) => s.isSet).length;
+  res.json({ total, setCount, status });
+});
+
+/**
+ * GET /debug/kric/station-congestion?lnCd=4&stinCd=433
+ * 역사별 혼잡도 raw 응답 확인
+ *
+ * 예시:
+ *   ?lnCd=1&stinCd=152  ← 레일포털 샘플 (1호선 어느 역)
+ *   ?lnCd=4&stinCd=???  ← 4호선 사당역 (코드 확인 필요)
+ */
+router.get("/kric/station-congestion", async (req, res) => {
+  const lnCd = (req.query.lnCd as string) || "4";
+  const stinCd = (req.query.stinCd as string) || "433";
+  const railOprIsttCd = (req.query.railOprIsttCd as string) || "S1";
+
+  try {
+    const result = await getStationCongestionRaw({ lnCd, stinCd, railOprIsttCd });
+    res.json({
+      operation: "stationCongestion",
+      query: { railOprIsttCd, lnCd, stinCd },
+      raw: result.raw,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: msg });
+  }
+});
+
+/**
+ * GET /debug/kric/raw?api=stationCongestion&lnCd=4&stinCd=...
+ * 임의의 KRIC API를 query 파라미터로 호출 (8개 API 모두 테스트 가능)
+ *
+ * 예시:
+ *   ?api=stationCongestion&railOprIsttCd=S1&lnCd=4&stinCd=433
+ *   ?api=platform&railOprIsttCd=S1&lnCd=4&stinCd=433
+ *   ?api=facility&railOprIsttCd=S1&lnCd=4&stinCd=433
+ */
+router.get("/kric/raw", async (req, res) => {
+  const apiId = req.query.api as KricApiId | undefined;
+  if (!apiId || !(apiId in KRIC_APIS)) {
+    return res.status(400).json({
+      error: `?api= 필요. 사용 가능: ${Object.keys(KRIC_APIS).join(", ")}`,
+    });
+  }
+
+  const params: Record<string, string> = {};
+  for (const [k, v] of Object.entries(req.query)) {
+    if (k === "api") continue;
+    if (typeof v === "string") params[k] = v;
+  }
+
+  try {
+    const result = await callKric(apiId, params);
+    res.json({ apiId, params, raw: result.raw });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(502).json({ error: msg });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// 기존 data.go.kr 디버그 (KORAIL — Phase 3 보류)
+// ─────────────────────────────────────────────────────────────────
+
 
 /**
  * GET /debug/data-go-kr/run-info
