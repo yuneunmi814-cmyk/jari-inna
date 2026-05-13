@@ -13,6 +13,7 @@ import { Router, Request, Response } from "express";
 import { getCarCongestion, PuzzleStatRow } from "../services/puzzle/client";
 import { findStationByName, type LineKey } from "../data/lineStationCodes";
 import { ApiResponse } from "../../../shared/types/metro";
+import { loadDiskCache, scheduleDiskSave } from "../services/puzzle/diskCache";
 
 const router = Router();
 
@@ -32,13 +33,22 @@ function fail(code: string, message: string): ApiResponse<never> {
 //   - 키: `${stationCode}_${dow}_${hh}` (예: "226_TUE_21")
 //   - hh 가 바뀌면 자동 새 키 → 1시간마다 새로 SK 호출
 //   - 같은 dow+hh 안에선 12시간 보존 (월 호출 한도 보호)
+//   - 디스크 영구화: server/.cache/puzzle.json (lazy init + 1초 debounce save)
 // ─────────────────────────────────────────────────────────────
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 interface CacheEntry {
   data: NormalizedCarCongestion;
   expiresAt: number;
 }
-const cache = new Map<string, CacheEntry>();
+
+// lazy init — 첫 요청 때 디스크에서 복원 (Express 라우트 비동기 초기화 회피)
+let cache: Map<string, CacheEntry> | null = null;
+async function getCache(): Promise<Map<string, CacheEntry>> {
+  if (!cache) {
+    cache = (await loadDiskCache()) as Map<string, CacheEntry>;
+  }
+  return cache;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 정규화 타입 (앱이 바로 쓰는 포맷)
@@ -380,21 +390,22 @@ router.get("/car-congestion/:stationName", async (req: Request, res: Response) =
   // dow/hh 별로 분리 → 시간대 흐름에 따라 새 데이터 받음, 같은 dow+hh 는 12시간 캐시
   const now = getKstNow();
   const cacheKey = `${stationCode}_${now.dow}_${now.hh}`;
-  const cached = cache.get(cacheKey);
+  const cacheMap = await getCache();
+  const cached = cacheMap.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    console.log(
-      `[puzzle.routes] 캐시 hit: ${stationName} ${cacheKey}`
-    );
+    console.log(`[puzzle.routes] 캐시 hit: ${stationName} ${cacheKey}`);
     return res.json(ok(cached.data));
   }
 
   try {
     const raw = await getCarCongestion(stationCode);
     const normalized = normalize(raw, now);
-    cache.set(cacheKey, {
+    cacheMap.set(cacheKey, {
       data: normalized,
       expiresAt: Date.now() + CACHE_TTL_MS,
     });
+    // 1초 debounce 후 디스크 저장 — 빈번한 set 에도 디스크 IO 최소화
+    scheduleDiskSave(cacheMap);
     return res.json(ok(normalized));
   } catch (err) {
     const message = err instanceof Error ? err.message : "알 수 없는 오류";
