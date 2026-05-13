@@ -28,9 +28,12 @@ function fail(code: string, message: string): ApiResponse<never> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 인메모리 캐시 (5분) — PUZZLE 데이터는 통계라 자주 갱신 불필요
+// 인메모리 캐시 (12시간) — PUZZLE 통계 데이터는 요일+시간 단위로 거의 안 바뀜
+//   - 키: `${stationCode}_${dow}_${hh}` (예: "226_TUE_21")
+//   - hh 가 바뀌면 자동 새 키 → 1시간마다 새로 SK 호출
+//   - 같은 dow+hh 안에선 12시간 보존 (월 호출 한도 보호)
 // ─────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 interface CacheEntry {
   data: NormalizedCarCongestion;
   expiresAt: number;
@@ -98,7 +101,12 @@ export interface DirectionCongestion {
 // 시간 라벨링 (KST)
 // ─────────────────────────────────────────────────────────────
 
-function getKstNow(): { hh: string; mm: string; hourLabel: string } {
+function getKstNow(): {
+  hh: string;
+  mm: string;
+  hourLabel: string;
+  dow: string;
+} {
   const now = new Date();
   // UTC + 9 시간 = KST
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -106,6 +114,8 @@ function getKstNow(): { hh: string; mm: string; hourLabel: string } {
   // 10분 단위로 내림 (PUZZLE 데이터 10분 단위)
   const minute = kst.getUTCMinutes();
   const mm = String(Math.floor(minute / 10) * 10).padStart(2, "0");
+  // 요일 — 캐시 키 분리용 (PUZZLE 통계는 dow별 평균)
+  const dow = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][kst.getUTCDay()];
 
   const hourNum = parseInt(hh, 10);
   let hourLabel = "";
@@ -115,7 +125,7 @@ function getKstNow(): { hh: string; mm: string; hourLabel: string } {
   else if (hourNum >= 22 || hourNum < 6) hourLabel = "심야시간";
   else hourLabel = "일반시간";
 
-  return { hh, mm, hourLabel };
+  return { hh, mm, hourLabel, dow };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -366,13 +376,15 @@ router.get("/car-congestion/:stationName", async (req: Request, res: Response) =
   // 다른 호선은 영향 없음 (1호선 "150", 2호선 "222" 등 이미 0 없음)
   const stationCode = stationInfo.stinCd.replace(/^0+/, "");
 
-  // 캐시 키 = stationCode (호선별로 stinCd 다름)
-  const cacheKey = stationCode;
-  const cached = cache.get(cacheKey);
+  // 캐시 키 = ${stationCode}_${dow}_${hh}
+  // dow/hh 별로 분리 → 시간대 흐름에 따라 새 데이터 받음, 같은 dow+hh 는 12시간 캐시
   const now = getKstNow();
+  const cacheKey = `${stationCode}_${now.dow}_${now.hh}`;
+  const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    // 캐시 hit — 다만 시간이 바뀌었으면 정규화 다시 (raw 보존 안 함 — 간단화)
-    console.log(`[puzzle.routes] 캐시 hit: ${stationName} (${stationCode})`);
+    console.log(
+      `[puzzle.routes] 캐시 hit: ${stationName} ${cacheKey}`
+    );
     return res.json(ok(cached.data));
   }
 
