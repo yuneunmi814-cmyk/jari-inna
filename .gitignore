@@ -40,3 +40,6 @@ web-build/
 .cache/
 .parcel-cache/
 .turbo/
+
+# 출시 스크린샷 원본 (카톡 큰 파일)
+docs/screenshots/raw/
