@@ -26,7 +26,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.seated.app"
+        "EXPO_PUBLIC_API_URL": "https://seated-yoon.fly.dev"
       }
     }
   },

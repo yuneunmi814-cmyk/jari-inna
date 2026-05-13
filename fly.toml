@@ -1,0 +1,48 @@
+# 시티드 백엔드 Fly.io 배포 설정
+#
+# ⚠️ 배포 전 반드시 수정할 것:
+#   - app = "..." 줄을 본인이 정한 앱 이름으로 (전세계 unique, lowercase, hyphen 가능)
+#
+# 무료 한도 안에서 운영:
+#   - shared-cpu-1x, 256MB RAM
+#   - 사용 없을 때 auto-stop (콜드 스타트 1~2초)
+#   - volume 1GB (puzzle 디스크 캐시 영속화용)
+
+app = "seated-yoon"
+primary_region = "nrt"   # 도쿄 — 한국 사용자 latency 30ms
+
+[build]
+  # Dockerfile 사용 (프로젝트 루트의 Dockerfile)
+  # 빌드 컨텍스트는 프로젝트 루트 (.)
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"     # 트래픽 없으면 정지 (비용 절약)
+  auto_start_machines = true       # 요청 오면 자동 기동
+  min_machines_running = 0         # v1.0 초기엔 0, 사용자 늘면 1로 올려 콜드 스타트 제거
+  processes = ["app"]
+
+# 헬스체크 — /health 가 200 응답해야 정상 인식
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+# 디스크 영속화 — server/.cache 마운트
+# 컨테이너 내부 경로는 Dockerfile WORKDIR(/repo/server) 기준
+[mounts]
+  source = "cache"
+  destination = "/repo/server/.cache"
+  initial_size = "1gb"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

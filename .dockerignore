@@ -1,0 +1,39 @@
+# Fly.io / Docker 빌드 컨텍스트에서 제외
+# server + shared 만 필요. app(RN) / docs / scripts 는 모두 제외.
+
+# 워크스페이스에서 서버와 무관한 큰 디렉토리
+app/
+docs/
+scripts/
+
+# 예외: app/ 전체는 제외하지만 매니페스트만 노출 (npm 워크스페이스 정합성 확보)
+# root package.json 의 workspaces 선언에 app 이 들어있어서 npm ci 시 app/package.json 이 존재해야 함
+!app/package.json
+
+# 노드 모듈은 컨테이너 내부에서 재설치
+**/node_modules
+
+# 빌드 산출물 (컨테이너 내부에서 재빌드)
+**/dist
+**/.cache
+
+# 환경 파일 (Fly secrets 사용)
+.env
+.env.*
+**/.env
+**/.env.*
+
+# VCS
+.git
+.gitignore
+.github
+
+# 에디터 / OS
+.vscode
+.idea
+.DS_Store
+**/.DS_Store
+*.log
+
+# 출시 자료 (커밋엔 포함되지만 컨테이너엔 불필요)
+docs/screenshots
