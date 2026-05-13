@@ -4,13 +4,13 @@
     "slug": "jari-inna",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icons/jarijabi-icon.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/icons/jarijabi-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#00A4E4"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,14 +19,14 @@
     "android": {
       "package": "com.paenda.seated",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icons/jarijabi-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#00A4E4"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/icons/jarijabi-icon.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
