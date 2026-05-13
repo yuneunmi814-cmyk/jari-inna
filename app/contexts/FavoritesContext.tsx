@@ -2,9 +2,10 @@
 // 각 즐겨찾기 항목은 역명 + 평소 이용 시간대(메모)를 함께 저장
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { STORAGE_KEYS } from "../utils/storageKeys";
 
-const STORAGE_KEY = "@jari-inna/favorites";
+const STORAGE_KEY = STORAGE_KEYS.favoriteStations;
 
 export interface Favorite {
   id: string;           // 고유 ID (역명 + 추가 시각 기반)
@@ -18,6 +19,8 @@ type FavoritesContextValue = {
   addFavorite: (stationName: string, usualTime?: string) => void;
   removeFavorite: (id: string) => void;
   isFavorite: (stationName: string) => boolean;
+  /** 전체 즐겨찾기 + 저장소 일괄 삭제 (설정 화면 "즐겨찾기 초기화"에서 사용) */
+  clearAll: () => Promise<void>;
   ready: boolean;
 };
 
@@ -70,9 +73,16 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const isFavorite = (stationName: string) =>
     favorites.some((f) => f.stationName === stationName);
 
+  const clearAll = useCallback(async () => {
+    // 저장소 먼저 비우고 메모리 state 초기화 — useEffect의 setItem 가 빈 배열 한 번 더
+    // 덮어쓰지만 동일 결과라 안전.
+    await AsyncStorage.removeItem(STORAGE_KEY);
+    setFavorites([]);
+  }, []);
+
   return (
     <FavoritesContext.Provider
-      value={{ favorites, addFavorite, removeFavorite, isFavorite, ready }}
+      value={{ favorites, addFavorite, removeFavorite, isFavorite, clearAll, ready }}
     >
       {children}
     </FavoritesContext.Provider>

@@ -6,6 +6,7 @@ import React from "react";
 import FavoritesScreen from "../screens/FavoritesScreen";
 import HomeScreen from "../screens/HomeScreen";
 import RecommendationScreen from "../screens/RecommendationScreen";
+import SettingsScreen from "../screens/SettingsScreen";
 import StationPickerScreen from "../screens/StationPickerScreen";
 import { colors } from "../theme/colors";
 import type { RootStackParamList } from "./types";
@@ -26,6 +27,7 @@ export function RootNavigator() {
       <Stack.Screen name="StationPicker" component={StationPickerScreen} />
       <Stack.Screen name="Favorites" component={FavoritesScreen} />
       <Stack.Screen name="Recommendation" component={RecommendationScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }

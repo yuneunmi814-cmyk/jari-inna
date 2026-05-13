@@ -11,8 +11,9 @@ import type {
   FavoriteRouteUpdate,
   NewFavoriteRoute,
 } from "../types/favorites";
+import { STORAGE_KEYS } from "./storageKeys";
 
-const STORAGE_KEY = "@jari-inna/favorite-routes";
+const STORAGE_KEY = STORAGE_KEYS.favoriteRoutes;
 
 /**
  * 고유 ID 생성 — timestamp + 짧은 랜덤 (uuid 라이브러리 없이도 충분히 unique)
@@ -81,4 +82,11 @@ export async function updateFavorite(
 ): Promise<void> {
   const list = await getFavorites();
   await saveAll(list.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+}
+
+/**
+ * 모든 경로 즐겨찾기 일괄 삭제 (설정 화면 "즐겨찾기 초기화"에서 사용)
+ */
+export async function clearAllFavorites(): Promise<void> {
+  await AsyncStorage.removeItem(STORAGE_KEY);
 }

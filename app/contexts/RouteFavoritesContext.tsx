@@ -6,6 +6,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   addFavorite as addToStorage,
+  clearAllFavorites as clearAllInStorage,
   deleteFavorite as deleteFromStorage,
   getFavorites as loadFromStorage,
   updateFavorite as updateInStorage,
@@ -31,6 +32,9 @@ type Value = {
 
   /** 출발/도착 페어가 이미 즐겨찾기에 있는지 (HomeScreen 버튼 활성 결정용) */
   hasRoute: (departure: string, destination: string) => boolean;
+
+  /** 전체 경로 즐겨찾기 + 저장소 일괄 삭제 (설정 화면에서 사용) */
+  clearAll: () => Promise<void>;
 };
 
 const RouteFavoritesContext = createContext<Value | null>(null);
@@ -69,9 +73,14 @@ export function RouteFavoritesProvider({ children }: { children: React.ReactNode
     [routes]
   );
 
+  const clearAll = useCallback(async () => {
+    await clearAllInStorage();
+    setRoutes([]);
+  }, []);
+
   return (
     <RouteFavoritesContext.Provider
-      value={{ routes, ready, addRoute, removeRoute, editRoute, hasRoute }}
+      value={{ routes, ready, addRoute, removeRoute, editRoute, hasRoute, clearAll }}
     >
       {children}
     </RouteFavoritesContext.Provider>

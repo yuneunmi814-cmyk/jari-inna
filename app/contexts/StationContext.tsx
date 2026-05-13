@@ -15,9 +15,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { LineKey } from "../constants/lines";
 import type { Direction } from "../utils/directionCalculator";
+import { STORAGE_KEYS } from "../utils/storageKeys";
 
-const STORAGE_STATION = "@jari-inna/selected-station";
-const STORAGE_DEP_LINE = "@jari-inna/departure-line";
+const STORAGE_STATION = STORAGE_KEYS.selectedStation;
+const STORAGE_DEP_LINE = STORAGE_KEYS.departureLine;
 const DEFAULT_STATION = "사당";
 const DEFAULT_LINE: LineKey = "4";
 

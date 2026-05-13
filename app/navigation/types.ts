@@ -13,6 +13,7 @@ export type RootStackParamList = {
   StationPicker: { mode?: StationPickerMode } | undefined;
   Favorites: undefined;
   Recommendation: undefined; // Phase 1: Context에서 출발/도착/방면 읽음. param 안 받음.
+  Settings: undefined;
 };
 
 // 글로벌 declare로 useNavigation 등에서 자동 추론 가능

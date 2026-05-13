@@ -1,11 +1,19 @@
 // 홈 화면 상단 헤더
-// 좌측 로고 + 우측 설정 아이콘 + 그 아래 시간대별 인사
+// 좌측 로고 + 우측 설정 진입 햄버거(☰) + 그 아래 시간대별 인사
+//
+// 햄버거 컬러: #00A4E4 (시티드 브랜드 블루 — 앱 아이콘/스플래시와 동일)
+// 탭 영역: 24pt 아이콘 + 44x44 최소 영역 + hitSlop 12 → iOS HIG 충족
 
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
 import { typography } from "../theme/typography";
+
+type NavProp = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * 시간대별 친근한 인사말
@@ -21,16 +29,19 @@ function getGreeting(): string {
 }
 
 export default function Header() {
+  const navigation = useNavigation<NavProp>();
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
         <Text style={styles.logo}>🚇 시티드</Text>
         <Pressable
-          onPress={() => Alert.alert("설정", "Phase 2에 추가 예정입니다")}
+          onPress={() => navigation.navigate("Settings")}
           hitSlop={12}
-          style={({ pressed }) => [styles.settingsBtn, pressed && { opacity: 0.5 }]}
+          accessibilityLabel="설정 열기"
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.5 }]}
         >
-          <Text style={styles.settingsIcon}>⚙️</Text>
+          <Text style={styles.menuIcon}>☰</Text>
         </Pressable>
       </View>
       <Text style={styles.greeting}>{getGreeting()}</Text>
@@ -53,8 +64,18 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: -0.5,
   },
-  settingsBtn: { padding: spacing.xs },
-  settingsIcon: { fontSize: 22 },
+  menuBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuIcon: {
+    fontSize: 24,
+    lineHeight: 28,
+    color: "#00A4E4", // 시티드 브랜드 블루 (앱 아이콘과 동일)
+    fontWeight: "700",
+  },
   greeting: {
     ...typography.body,
     color: colors.textSecondary,
