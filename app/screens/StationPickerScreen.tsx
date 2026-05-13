@@ -25,12 +25,14 @@ import LineFilterChips, {
   type LineFilterKey,
 } from "../components/LineFilterChips";
 import LineSelectModal from "../components/LineSelectModal";
+import NearbyStationsSection from "../components/NearbyStationsSection";
 import SearchBar from "../components/SearchBar";
 import StationListItem from "../components/StationListItem";
 import { CHOSUNG_ORDER } from "../constants/line4Stations";
 import { TRANSFER_STATIONS, type LineKey } from "../constants/lines";
 import { useFavorites } from "../contexts/FavoritesContext";
 import { useStation } from "../contexts/StationContext";
+import { useNearestStation } from "../hooks/useNearestStation";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
 import { spacing } from "../theme/spacing";
@@ -131,6 +133,34 @@ export default function StationPickerScreen() {
   // 환승역 모달 pending state
   const [pending, setPending] = useState<{ name: string; lines: LineKey[] } | null>(null);
 
+  // GPS 가까운 역 (출발역 모드 + 검색 중 아닐 때만 표시)
+  const gps = useNearestStation();
+  const showNearbySection = !isDestinationMode && !isSearching;
+
+  /** GPS 섹션에서 역 선택 — 역명만 받아서 lines 추론 후 finalize */
+  const handleSelectFromGps = (name: string) => {
+    // STATION_LOCATIONS 의 그 역 lines (한글) → 환승역이면 모달
+    const gpsItem = gps.nearestList.find((x) => x.station.name === name);
+    if (!gpsItem) return;
+    // 우리 LineKey 매핑 — TRANSFER_STATIONS lookup 우선 (1~9 호선만)
+    const ourLines = TRANSFER_STATIONS[name];
+    if (ourLines && ourLines.length > 1) {
+      setPending({ name, lines: ourLines });
+      return;
+    }
+    if (ourLines && ourLines.length === 1) {
+      finalizeSelection(name, ourLines[0]);
+      return;
+    }
+    // 1~9호선 매핑 없으면 (예: 신분당선 단독) — 기본 처리: 가장 가까운 1~9호선 코드 추출
+    const fallback = gpsItem.station.lines
+      .map((n) => n.match(/(\d)호선/)?.[1])
+      .find((d) => d && d >= "1" && d <= "9") as LineKey | undefined;
+    if (fallback) {
+      finalizeSelection(name, fallback);
+    }
+  };
+
   /** 역 선택 — 환승역이면 모달, 단일이면 즉시 적용 */
   const handleSelect = (item: DisplayStation) => {
     if (item.lines.length > 1) {
@@ -206,6 +236,17 @@ export default function StationPickerScreen() {
       <SectionList
         sections={sections}
         keyExtractor={(item, idx) => `${item.name}-${idx}`}
+        ListHeaderComponent={
+          showNearbySection ? (
+            <NearbyStationsSection
+              status={gps.status}
+              nearestList={gps.nearestList}
+              onSelectStation={handleSelectFromGps}
+              onRefresh={gps.refresh}
+              onOpenSettings={gps.openSettings}
+            />
+          ) : null
+        }
         renderItem={({ item }) => {
           const isDisabled = disabledStation === item.name;
           return (

@@ -26,8 +26,17 @@ type StationContextValue = {
   station: string;
   /** 출발역 호선 (영속화, 기본 '4') */
   departureLine: LineKey;
-  /** 출발역을 변경. lineCode를 함께 명시 가능 (환승역 모달에서 사용) */
+  /**
+   * GPS 로 자동 선택됐는지. 사용자가 수동 선택하면 false 로 변경.
+   * - 매 세션 마운트 시 false 로 시작
+   * - useNearestStation 결과로 setStationFromGps 호출 시 true
+   * - 사용자 수동 setStation 호출 시 false
+   */
+  isGpsSelected: boolean;
+  /** 출발역을 변경 (수동). lineCode를 함께 명시 가능 (환승역 모달에서 사용) */
   setStation: (name: string, lineCode?: LineKey) => void;
+  /** GPS 자동 선택으로 출발역 변경 — isGpsSelected = true */
+  setStationFromGps: (name: string, lineCode?: LineKey) => void;
   /** 출발역 호선만 단독으로 변경 */
   setDepartureLine: (ln: LineKey) => void;
 
@@ -70,6 +79,9 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
   const [destinationLine, setDestinationLineState] = useState<LineKey | null>(null);
   const [direction, setDirectionState] = useState<Direction | null>(null);
   const [ready, setReady] = useState(false);
+  // GPS 자동 선택 여부 — 매 세션 마운트 시 false (영속화 X).
+  // 사용자가 수동 선택하면 false 로 전환 — 그 세션 동안 GPS 재호출 안 함.
+  const [isGpsSelected, setIsGpsSelected] = useState(false);
 
   // 앱 시작 시 저장된 출발역 + 호선 복원
   useEffect(() => {
@@ -92,13 +104,30 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
 
   const setStation = (name: string, lineCode?: LineKey) => {
     const ln = lineCode ?? DEFAULT_LINE;
-    console.log("[StationContext] setStation:", { name, lineCode: ln });
+    console.log("[StationContext] setStation (수동):", { name, lineCode: ln });
     setStationState(name);
     setDepartureLineState(ln);
+    setIsGpsSelected(false); // 수동 선택 — GPS 라벨 X, 이 세션은 GPS 재호출 안 함
     // 출발역 바뀌면 도착/방면 reset
     setDestinationState(null);
     setDestinationLineState(null);
     setDirectionState(null);
+    AsyncStorage.setItem(STORAGE_STATION, name).catch(() => {});
+    AsyncStorage.setItem(STORAGE_DEP_LINE, ln).catch(() => {});
+  };
+
+  /**
+   * GPS 로 자동 선택. 사용자 수동 setStation 과 다음 차이:
+   *   - isGpsSelected = true (UI 라벨 "📍 GPS" 표시)
+   *   - AsyncStorage 도 저장 (다음 세션 fallback 용)
+   *   - 도착/방면 reset 안 함 (HomeScreen 진입 시 호출되므로)
+   */
+  const setStationFromGps = (name: string, lineCode?: LineKey) => {
+    const ln = lineCode ?? DEFAULT_LINE;
+    console.log("[StationContext] setStationFromGps:", { name, lineCode: ln });
+    setStationState(name);
+    setDepartureLineState(ln);
+    setIsGpsSelected(true);
     AsyncStorage.setItem(STORAGE_STATION, name).catch(() => {});
     AsyncStorage.setItem(STORAGE_DEP_LINE, ln).catch(() => {});
   };
@@ -177,7 +206,9 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
       value={{
         station,
         departureLine,
+        isGpsSelected,
         setStation,
+        setStationFromGps,
         setDepartureLine,
         destination,
         destinationLine,

@@ -16,10 +16,17 @@ interface Props {
   /** 명시적 호선들 — 호출자가 departureLine 등 컨텍스트 정보로 전달.
    *  생략 시 TRANSFER_STATIONS lookup, 그래도 없으면 dot 안 보임. */
   lines?: LineKey[];
+  /** GPS 로 자동 선택된 역이면 "📍 GPS" 작은 라벨 노출 */
+  isGpsSelected?: boolean;
   onPress: () => void;
 }
 
-export default function StationSelector({ station, lines, onPress }: Props) {
+export default function StationSelector({
+  station,
+  lines,
+  isGpsSelected,
+  onPress,
+}: Props) {
   // 명시 전달 우선 → 환승역 lookup → 빈 배열(dot 안 보임).
   // ⚠️ 과거 ['4'] fallback 있었음 — 2호선 강남 등 단일호선 역에서 4호선 dot 잘못 표시되는
   //    버그 유발. 호출자가 항상 LineKey 전달하게 함 (HomeScreen에서 departureLine 사용).
@@ -36,7 +43,14 @@ export default function StationSelector({ station, lines, onPress }: Props) {
     >
       <View style={styles.inner}>
         <View style={styles.left}>
-          <Text style={styles.label}>출발역</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>출발역</Text>
+            {isGpsSelected && (
+              <View style={styles.gpsBadge}>
+                <Text style={styles.gpsBadgeText}>📍 GPS</Text>
+              </View>
+            )}
+          </View>
           <View style={styles.stationRow}>
             <Text style={styles.station}>{station}</Text>
             <View style={styles.lineDots}>
@@ -65,10 +79,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   left: { flex: 1 },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
   label: {
     ...typography.caption,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
+  },
+  // "📍 GPS" 작은 알약 — 출발역 자동 선택 알림
+  gpsBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    backgroundColor: colors.primaryLight,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+  },
+  gpsBadgeText: {
+    ...typography.micro,
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: 10,
   },
   // 역 이름 + 호선 점 한 줄
   stationRow: {

@@ -11,7 +11,7 @@
 
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -37,7 +37,9 @@ import TrainPositionChip from "../components/TrainPositionChip";
 import { useRouteFavorites } from "../contexts/RouteFavoritesContext";
 import { useStation } from "../contexts/StationContext";
 import { useArrivals } from "../hooks/useArrivals";
+import { useNearestStation } from "../hooks/useNearestStation";
 import { usePositions } from "../hooks/usePositions";
+import { type LineKey } from "../constants/lines";
 import type { RootStackParamList } from "../navigation/types";
 import { colors } from "../theme/colors";
 import { shadows } from "../theme/shadows";
@@ -46,11 +48,30 @@ import { typography } from "../theme/typography";
 
 type NavProp = NativeStackNavigationProp<RootStackParamList, "Home">;
 
+/**
+ * stationLocations.ts 의 노선명 array → LineKey 매핑.
+ * 예: ["2호선", "신분당선"] → "2"
+ *     ["서울 도시철도 9호선"] → "9"
+ *     ["수도권 도시철도 8호선"] → "8"
+ * 1~9호선 중 첫 매치만 반환 (환승역은 임의 — 사용자가 수동 변경 가능).
+ * 1~9호선 어느 것도 없으면 null (예: 신분당선 단독).
+ */
+function resolveLineKey(lineNames: string[]): LineKey | null {
+  for (const name of lineNames) {
+    const m = name.match(/(\d)호선/);
+    if (m && m[1] >= "1" && m[1] <= "9") {
+      return m[1] as LineKey;
+    }
+  }
+  return null;
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<NavProp>();
   const {
     station,
     departureLine,
+    isGpsSelected,
     destination,
     destinationLine,
     direction,
@@ -58,8 +79,23 @@ export default function HomeScreen() {
     setDirection,
     swapStations,
     setTrip,
+    setStationFromGps,
   } = useStation();
   const { routes: favRoutes, addRoute, hasRoute } = useRouteFavorites();
+
+  // GPS 자동 선택 — useNearestStation 은 마운트 시 1회 호출.
+  // gps.status/gps.nearest 가 set 되는 시점 한 번만 useEffect trigger.
+  // 사용자 수동 setStation 후엔 GPS hook 이 재호출되지 않으므로 useEffect 도 재실행 X.
+  // 사용자가 "📍 내 위치 근처 역" 버튼으로 refresh() 호출하면 그땐 의도적으로 새 GPS 적용.
+  const gps = useNearestStation();
+  useEffect(() => {
+    if (gps.status !== "granted" || !gps.nearest) return;
+    const lineKey = resolveLineKey(gps.nearest.station.lines);
+    if (!lineKey) return;
+    setStationFromGps(gps.nearest.station.name, lineKey);
+    // deps 의도적으로 최소화 — gps 결과 변경 시만 trigger, station/setter 제외해서 무한 루프 방지
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gps.status, gps.nearest]);
 
   // 즐겨찾기 추가 모달 표시 여부 — 출발/도착 둘 다 있을 때만 활성
   const [favModalVisible, setFavModalVisible] = useState(false);
@@ -126,13 +162,27 @@ export default function HomeScreen() {
           onAddNew={() => navigation.navigate("Favorites")}
         />
 
-        {/* 2. 출발역 카드 — dot 컬러를 departureLine 기준으로 표시 */}
-        {/*    (안 넘기면 StationSelector 가 ["4"] 하드코딩 fallback) */}
+        {/* 2. 출발역 카드 — dot 컬러를 departureLine 기준으로 표시.
+              isGpsSelected 면 "📍 GPS" 작은 라벨 노출. */}
         <StationSelector
           station={station}
           lines={[departureLine]}
+          isGpsSelected={isGpsSelected}
           onPress={() => navigation.navigate("StationPicker", { mode: "departure" })}
         />
+
+        {/* 2.1 GPS 실패/거부 안내 — 사용자에게 "지금 마지막 선택 역으로 표시 중" 알림.
+              loading/granted/out_of_range 는 표시 안 함 (granted 는 GPS 라벨로 충분) */}
+        {(gps.status === "denied" || gps.status === "error") && (
+          <View style={styles.gpsNotice}>
+            <Text style={styles.gpsNoticeIcon}>📍</Text>
+            <Text style={styles.gpsNoticeText}>
+              {gps.status === "denied"
+                ? "위치 권한이 없어 마지막 선택 역으로 표시했어요"
+                : "위치를 못 잡았어요. 지하/실내 일 수도 있어요"}
+            </Text>
+          </View>
+        )}
 
         {/* 2.5 출발 ↔ 도착 swap 버튼 row — 도착역 있을 때만 활성 */}
         <View style={styles.swapRow}>
@@ -325,6 +375,29 @@ const styles = StyleSheet.create({
   swapRow: {
     alignItems: "center",
     marginTop: spacing.sm,
+  },
+
+  // GPS 실패/거부 inline 배너 — 작고 자극 적게
+  gpsNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.textTertiary,
+  },
+  gpsNoticeIcon: {
+    fontSize: 14,
+  },
+  gpsNoticeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+    lineHeight: 18,
   },
 
   // "어디로 가세요?" 카드

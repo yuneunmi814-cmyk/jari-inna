@@ -69,10 +69,14 @@ export function useNearestStation(): UseNearestStationResult {
         return;
       }
 
-      // 2. 현재 위치
-      const pos = await Location.getCurrentPositionAsync({
+      // 2. 현재 위치 — 5초 timeout (지하/실내 등 응답 늦으면 fallback)
+      const positionPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("위치 timeout (5초)")), 5000)
+      );
+      const pos = await Promise.race([positionPromise, timeoutPromise]);
       const { latitude, longitude } = pos.coords;
       console.log(
         `[useNearestStation] 위치 받음: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
