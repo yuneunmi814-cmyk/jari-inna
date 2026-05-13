@@ -5,76 +5,113 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="index,follow" />
 <title>시티드 개인정보처리방침</title>
-<meta name="description" content="시티드 앱 개인정보처리방침. GPS 위치는 가까운 역 찾기에만 사용되며 기기 밖으로 전송되지 않습니다." />
+<meta name="description" content="시티드 앱 개인정보처리방침. GPS 위치는 가까운 역 찾기에만 잠깐 쓰이고 저장되지 않습니다." />
 <style>
   :root {
-    --bg: #ffffff;
-    --fg: #1a1a1a;
-    --muted: #555;
+    --bg: #F5F5F5;
+    --card: #FFFFFF;
+    --fg: #1A1A1A;
+    --muted: #555555;
+    --subtle: #777777;
     --accent: #00A4E4;
-    --border: #e5e7eb;
-    --code-bg: #f3f4f6;
+    --border: #E5E7EB;
+    --code-bg: #F0F0F2;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
                  "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif;
-    line-height: 1.7;
+    line-height: 1.75;
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
   }
+
   .header {
     background: var(--accent);
     color: #fff;
-    padding: 40px 24px 32px;
+    padding: 44px 24px 36px;
   }
   .header-inner {
     max-width: 720px;
     margin: 0 auto;
   }
-  .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.04em; opacity: 0.9; }
-  h1 { margin: 8px 0 4px; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
-  .updated { font-size: 13px; opacity: 0.85; margin-top: 6px; }
+  .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.05em; opacity: 0.92; }
+  h1 { margin: 8px 0 6px; font-size: 30px; font-weight: 700; letter-spacing: -0.01em; }
+  .effective { font-size: 13.5px; opacity: 0.9; }
 
   main {
     max-width: 720px;
     margin: 0 auto;
-    padding: 32px 24px 64px;
+    padding: 24px 16px 56px;
   }
+
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 22px 22px 8px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+  .card:last-of-type { margin-bottom: 24px; }
+
   h2 {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
-    margin: 36px 0 12px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-    letter-spacing: -0.01em;
+    margin: 4px 0 12px;
+    letter-spacing: -0.005em;
+    color: var(--fg);
   }
-  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 8px; }
+  h2 .num {
+    display: inline-block;
+    min-width: 26px;
+    height: 26px;
+    line-height: 26px;
+    text-align: center;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    margin-right: 10px;
+    vertical-align: 1px;
+  }
+
   p, li { font-size: 15.5px; }
-  ul { padding-left: 22px; }
-  li { margin: 6px 0; }
+  ul { padding-left: 20px; margin: 6px 0 12px; }
+  li { margin: 4px 0; }
+  .card p:last-child, .card ul:last-child { margin-bottom: 16px; }
+
   code {
     background: var(--code-bg);
     border-radius: 4px;
     padding: 1px 6px;
     font-size: 13.5px;
-    font-family: "SF Mono", "Menlo", monospace;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    color: #333;
   }
-  .summary {
-    background: #f0fafe;
+
+  .tldr {
+    background: #E8F6FE;
     border-left: 4px solid var(--accent);
+    border-radius: 8px;
     padding: 14px 18px;
-    border-radius: 4px;
-    margin: 20px 0 8px;
+    margin: 0 0 16px;
   }
-  .summary p { margin: 6px 0; }
-  a { color: var(--accent); }
-  .muted { color: var(--muted); }
+  .tldr-title {
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+  }
+  .tldr ul { padding-left: 18px; }
+  .tldr li { margin: 4px 0; font-size: 15px; }
+
   table {
     width: 100%;
     border-collapse: collapse;
-    margin: 8px 0 16px;
+    margin: 4px 0 12px;
     font-size: 14.5px;
   }
   th, td {
@@ -83,117 +120,162 @@
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
-  th { background: #fafafa; font-weight: 600; }
+  th { background: #FAFAFA; font-weight: 600; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .muted { color: var(--subtle); font-size: 14px; }
+
   footer {
     text-align: center;
-    color: var(--muted);
+    color: var(--subtle);
     font-size: 13px;
-    padding: 24px;
-    border-top: 1px solid var(--border);
+    padding: 24px 16px 40px;
+  }
+
+  @media (min-width: 640px) {
+    main { padding: 32px 24px 64px; }
+    .card { padding: 28px 28px 12px; }
   }
 </style>
 </head>
 <body>
+
 <header class="header">
   <div class="header-inner">
     <div class="brand">시티드 · Seated</div>
     <h1>개인정보처리방침</h1>
-    <div class="updated">최종 수정일: 2026년 5월 13일 · 시행일: 2026년 5월 13일</div>
+    <div class="effective">시행일: 2026년 5월 22일</div>
   </div>
 </header>
 
 <main>
 
-<div class="summary">
-  <p><strong>요약</strong></p>
-  <p>· 시티드는 회원가입이 없습니다.</p>
-  <p>· GPS 위치는 “현재 위치에서 가까운 역”을 찾을 때만 일시적으로 사용하고 저장하지 않습니다.</p>
-  <p>· 즐겨찾기·최근 선택 같은 설정값은 <strong>이용자의 기기 안에만</strong> 저장됩니다.</p>
-  <p>· 어떠한 정보도 외부 서버로 전송되거나 제3자에게 제공되지 않습니다.</p>
+<div class="tldr">
+  <div class="tldr-title">한눈에 보기</div>
+  <ul>
+    <li>회원가입이 없어요. 이름·이메일·전화번호 같은 건 아예 받지 않아요.</li>
+    <li>GPS는 “가까운 역 찾기”에만 잠깐 쓰고 어디에도 저장하지 않아요.</li>
+    <li>즐겨찾기·최근 선택값만 <strong>이용자 기기 안에</strong> 저장돼요.</li>
+    <li>외부로 보내는 정보도, 제3자에게 주는 정보도 없어요.</li>
+    <li>설정 화면에서 언제든 데이터를 직접 삭제할 수 있어요.</li>
+  </ul>
 </div>
 
-<h2>1. 개요</h2>
-<p>시티드(이하 “서비스”)는 수도권 광역철도 이용자가 자리에 앉아 갈 가능성이 높은 칸을 추천받기 위한 모바일 앱입니다.
-본 방침은 서비스 이용 과정에서 처리되는 개인정보의 항목·목적·보관 방법·이용자 권리를 안내합니다.</p>
+<div class="card">
+  <h2><span class="num">1</span>이 방침이 다루는 것</h2>
+  <p>시티드(이하 “서비스”)는 수도권 광역철도 이용자가 “자리에 앉아 가기 좋은 칸”을 추천받기 위한 모바일 앱이에요.
+  본 방침은 서비스를 쓸 때 어떤 정보가 어디에서 어떻게 처리되는지를 정리해 둔 문서예요.</p>
+</div>
 
-<h2>2. 수집하는 정보</h2>
-<p>서비스는 회원가입을 요구하지 않으며, 이름·이메일·전화번호 등 개인을 식별할 수 있는 정보를 수집하지 않습니다.
-다음 항목만 기능 수행에 필요한 범위에서 처리됩니다.</p>
+<div class="card">
+  <h2><span class="num">2</span>받는 정보 (수집 항목)</h2>
+  <p>서비스는 가입 절차가 없고, 이름·이메일·전화번호 같은 개인을 식별할 수 있는 정보를 받지 않아요.
+  딱 두 가지만 기능 수행에 필요한 만큼 처리돼요.</p>
 
-<table>
-  <thead>
-    <tr><th>항목</th><th>목적</th><th>처리 방식</th></tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>위치 정보 (GPS 좌표)</td>
-      <td>현재 위치에서 가장 가까운 역을 찾아 출발역으로 자동 제안</td>
-      <td>이용자가 권한을 허용한 시점에만 일시적으로 조회. 기기·서버 어디에도 저장하지 않음</td>
-    </tr>
-    <tr>
-      <td>이용자 설정값</td>
-      <td>다음 실행 시 동일한 환경 유지</td>
-      <td>이용자 기기 내 AsyncStorage(로컬 저장소)에만 저장. 외부 전송 없음</td>
-    </tr>
-  </tbody>
-</table>
+  <table>
+    <thead>
+      <tr><th>항목</th><th>목적</th><th>처리 방식</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>위치 정보 (GPS 좌표)</td>
+        <td>현재 위치에서 가장 가까운 역을 찾아 출발역으로 자동 제안</td>
+        <td>이용자가 권한을 허용한 시점에만 메모리에서 잠깐 사용. 계산이 끝나면 즉시 폐기. 디스크·서버 어디에도 저장 안 함.</td>
+      </tr>
+      <tr>
+        <td>이용자 설정값</td>
+        <td>다음 실행 시 동일한 환경 유지</td>
+        <td>이용자 기기 내 로컬 저장소(AsyncStorage)에만 저장. 외부 전송 없음.</td>
+      </tr>
+    </tbody>
+  </table>
 
-<p>기기 내부에 저장되는 설정값은 구체적으로 다음과 같습니다.</p>
-<ul>
-  <li><code>@jari-inna/selected-station</code> — 마지막으로 선택한 출발역 이름</li>
-  <li><code>@jari-inna/departure-line</code> — 마지막으로 선택한 출발 호선</li>
-  <li><code>@jari-inna/favorites</code> — 이용자가 즐겨찾기에 추가한 역 목록</li>
-  <li><code>@jari-inna/favorite-routes</code> — 이용자가 즐겨찾기에 추가한 경로 목록</li>
-</ul>
+  <p>기기 내부에 저장되는 설정값은 정확히 아래 네 가지뿐이에요.</p>
+  <ul>
+    <li><code>@jari-inna/selected-station</code> — 마지막으로 선택한 출발역 이름</li>
+    <li><code>@jari-inna/departure-line</code> — 마지막으로 선택한 출발 호선</li>
+    <li><code>@jari-inna/favorites</code> — 즐겨찾기에 추가한 역 목록</li>
+    <li><code>@jari-inna/favorite-routes</code> — 즐겨찾기에 추가한 경로 목록 (출발↔도착)</li>
+  </ul>
+</div>
 
-<h2>3. 위치 정보 처리에 관한 안내</h2>
-<ul>
-  <li>위치 권한은 “앱 사용 중에만 허용”·“이번만 허용” 등 OS가 제공하는 옵션으로 이용자가 직접 선택합니다.</li>
-  <li>권한을 허용하지 않아도 서비스의 다른 기능(역 직접 선택, 혼잡도 보기, 환승 안내 등)은 정상 이용할 수 있습니다.</li>
-  <li>조회한 좌표는 가까운 역을 계산하는 즉시 메모리에서 폐기되며, 디스크나 외부 서버에 기록되지 않습니다.</li>
-  <li>이용자는 언제든 OS 설정 → 앱 권한에서 위치 권한을 회수할 수 있습니다.</li>
-</ul>
+<div class="card">
+  <h2><span class="num">3</span>위치 정보에 대한 안내</h2>
+  <ul>
+    <li>위치 권한은 “앱 사용 중에만 허용”, “이번만 허용” 같은 OS 기본 옵션 중 이용자가 직접 선택해요.</li>
+    <li>권한을 허용하지 않아도 다른 기능(역 직접 선택, 혼잡도 보기, 환승 안내 등)은 그대로 쓸 수 있어요.</li>
+    <li>조회한 좌표는 가장 가까운 역을 계산하는 그 순간에만 메모리에 머물고, 계산이 끝나면 바로 사라져요.</li>
+    <li>OS 설정 → 앱 권한에서 언제든 위치 권한을 회수할 수 있어요. 앱 내 <em>설정 → 위치 → 시스템 설정 열기</em> 로 바로 이동할 수도 있어요.</li>
+  </ul>
+</div>
 
-<h2>4. 보유 및 이용 기간</h2>
-<ul>
-  <li>위치 정보: 보관하지 않음 (조회 즉시 폐기)</li>
-  <li>설정값: 이용자가 앱을 삭제하거나 앱 데이터를 초기화할 때까지 기기 내부에 보관</li>
-</ul>
+<div class="card">
+  <h2><span class="num">4</span>보관 기간</h2>
+  <ul>
+    <li><strong>위치 정보</strong>: 보관하지 않음 (조회 즉시 폐기)</li>
+    <li><strong>설정값</strong>: 이용자가 앱을 지우거나 직접 삭제할 때까지 기기 안에 보관</li>
+  </ul>
+</div>
 
-<h2>5. 제3자 제공 및 처리위탁</h2>
-<p>서비스는 이용자의 어떠한 정보도 제3자에게 제공하거나 외부에 위탁하지 않습니다.
-또한 광고 식별자(ADID/IDFA) 수집, 사용 분석 SDK, 크래시 리포트 등 외부 전송이 발생하는 서드파티 도구를 사용하지 않습니다.</p>
+<div class="card">
+  <h2><span class="num">5</span>제3자 제공 · 외부 전송</h2>
+  <p>서비스는 이용자의 어떠한 정보도 외부로 보내지 않아요. 제3자 제공·위탁 모두 없어요.
+  광고 식별자(ADID/IDFA) 수집, 사용 분석 SDK, 크래시 리포트 등 백그라운드에서 정보를 전송하는 서드파티 도구도 사용하지 않아요.</p>
+</div>
 
-<h2>6. 외부 데이터 소스</h2>
-<p>열차 운행 정보·역 정보는 한국철도공사(Korail) 및 공공데이터포털(data.go.kr) 등에서 제공하는 공개 API를 이용해
-이용자의 기기에서 직접 조회합니다. 이 과정에서 이용자를 식별할 수 있는 정보는 함께 전송되지 않습니다.</p>
+<div class="card">
+  <h2><span class="num">6</span>외부 공공 데이터</h2>
+  <p>열차 운행·역 정보는 한국철도공사(Korail), 공공데이터포털(data.go.kr), 서울교통공사·국가철도공단 등 공공 기관이 제공하는 공개 API를 이용자의 기기에서 직접 조회해서 보여줘요.
+  이 과정에서 이용자를 식별할 수 있는 정보는 함께 전송되지 않아요.</p>
+</div>
 
-<h2>7. 이용자의 권리</h2>
-<ul>
-  <li>위치 권한 허용/회수: OS 설정에서 언제든 변경 가능 (앱 내 <em>설정 → 위치 → 시스템 설정 열기</em> 로 바로 이동)</li>
-  <li>저장된 설정값 삭제: 앱 내 <em>설정 → 데이터 관리</em> 에서 즐겨찾기·최근 선택·전체 데이터를 항목별로 언제든 삭제 가능. OS의 앱 데이터 초기화나 앱 삭제로도 즉시 제거됩니다.</li>
-</ul>
+<div class="card">
+  <h2><span class="num">7</span>이용자의 권리 (데이터 삭제 포함)</h2>
+  <ul>
+    <li><strong>앱 내에서 직접 삭제</strong>: <em>설정 → 데이터 관리</em> 에서 언제든 항목별로 지울 수 있어요.
+      <ul>
+        <li>즐겨찾기 초기화 — 즐겨찾기 역과 경로를 모두 삭제</li>
+        <li>최근 검색 기록 삭제 — 마지막 선택한 출발역·호선을 삭제</li>
+        <li>모든 데이터 초기화 — 위 네 키 전부 한 번에 삭제</li>
+      </ul>
+    </li>
+    <li><strong>OS에서 일괄 삭제</strong>: 시스템 설정의 “앱 데이터 초기화” 또는 앱 자체 삭제 시 모든 로컬 데이터가 자동으로 함께 제거돼요.</li>
+    <li><strong>위치 권한 변경</strong>: OS 설정에서 언제든 허용/거부를 바꿀 수 있어요.</li>
+  </ul>
+</div>
 
-<h2>8. 안전성 확보 조치</h2>
-<p>서비스는 개인정보를 수집·전송하지 않으므로 외부 유출 위험을 구조적으로 차단합니다.
-기기 내부에 저장되는 설정값은 OS가 제공하는 앱 샌드박스 안에서만 접근 가능합니다.</p>
+<div class="card">
+  <h2><span class="num">8</span>안전성 확보 조치</h2>
+  <p>서비스는 개인정보를 외부로 보내지 않는 구조라서, 유출 위험을 구조적으로 차단해요.
+  기기 안에 저장되는 설정값도 OS가 제공하는 앱 샌드박스 안에서만 접근할 수 있어요.</p>
+</div>
 
-<h2>9. 만 14세 미만 아동</h2>
-<p>서비스는 만 14세 미만 아동을 대상으로 별도의 개인정보를 수집하지 않습니다.</p>
+<div class="card">
+  <h2><span class="num">9</span>만 14세 미만 아동</h2>
+  <p>서비스는 만 14세 미만 아동을 대상으로 별도의 개인정보를 수집하지 않아요. 회원가입 자체가 없어요.</p>
+</div>
 
-<h2>10. 처리방침 변경</h2>
-<p>본 방침은 법령·서비스 변경에 따라 개정될 수 있습니다. 개정 시 본 페이지의 최종 수정일을 갱신하며,
-중요한 변경이 있는 경우 앱 내 공지 등을 통해 안내합니다.</p>
+<div class="card">
+  <h2><span class="num">10</span>방침 변경 안내</h2>
+  <p>본 방침은 법령·서비스 변경에 따라 개정될 수 있어요. 개정이 있을 때는 이 페이지의 시행일을 갱신하고, 중요한 변경이 있는 경우 앱 내 공지 등으로 알려드려요.</p>
+</div>
 
-<h2>11. 문의처</h2>
-<ul>
-  <li>이메일: <a href="mailto:yuneunmi814@gmail.com">yuneunmi814@gmail.com</a></li>
-</ul>
+<div class="card">
+  <h2><span class="num">11</span>문의처</h2>
+  <p>방침과 관련해 궁금한 점이 있으시면 아래로 연락 주세요.</p>
+  <ul>
+    <li>이메일: <a href="mailto:yuneunmi814@gmail.com">yuneunmi814@gmail.com</a></li>
+    <li>개발자: 프로젝트윤 (1인 개발)</li>
+  </ul>
+</div>
 
 </main>
 
 <footer>
-  © 2026 시티드(Seated). All rights reserved.
+  © 2026 시티드(Seated). 본 페이지는 시티드 앱 출시용 개인정보처리방침이에요.
 </footer>
 
 </body>

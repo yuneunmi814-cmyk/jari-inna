@@ -48,10 +48,17 @@ type Row = {
   title: string;
   /** 우측 표시값 (액션 행이면 undefined → '›' 렌더) */
   value?: string;
+  /** value 텍스트 컬러 (위치 권한 상태 색상 표시용) */
+  valueColor?: string;
   /** 탭 가능 여부. 없으면 비활성. */
   onPress?: () => void;
   destructive?: boolean;
 };
+
+// 권한 상태별 컬러 (의미 컬러)
+const PERM_COLOR_GRANTED = "#2ECC71"; // colors.success
+const PERM_COLOR_DENIED = "#F44336";  // destructive 빨강과 동일
+const PERM_COLOR_UNDETERMINED = "#999999"; // colors.textTertiary
 
 type Section = {
   title: string;
@@ -174,6 +181,41 @@ export default function SettingsScreen() {
     });
   };
 
+  /**
+   * 위치 권한 상태 행 탭 핸들러.
+   *   - granted: 액션 없음 (이미 허용 — 굳이 해제 유도하지 않음)
+   *   - denied: 시스템 설정으로 안내 (OS 정책상 in-app 재요청 불가)
+   *   - undetermined: in-app 권한 요청 다이얼로그 표시
+   */
+  const handlePermissionRowPress = async () => {
+    if (permStatus === "granted") return;
+    if (permStatus === "denied") {
+      handleOpenSystemSettings();
+      return;
+    }
+    if (permStatus === "undetermined") {
+      const result = await Location.requestForegroundPermissionsAsync();
+      setPermStatus(result.status);
+      return;
+    }
+  };
+
+  /** 권한 상태에 따른 value 텍스트 컬러 — granted/denied/undetermined 외엔 회색 */
+  const permColor =
+    permStatus === "granted"
+      ? PERM_COLOR_GRANTED
+      : permStatus === "denied"
+      ? PERM_COLOR_DENIED
+      : permStatus === "undetermined"
+      ? PERM_COLOR_UNDETERMINED
+      : colors.textSecondary;
+
+  /** 권한 상태에 따라 탭 가능한 행인지 — granted/loading 은 비활성 */
+  const permRowOnPress =
+    permStatus === "denied" || permStatus === "undetermined"
+      ? handlePermissionRowPress
+      : undefined;
+
   const handleContact = () => {
     const url = `mailto:${CONTACT_EMAIL}`;
     Linking.openURL(url).catch(() => {
@@ -222,6 +264,8 @@ export default function SettingsScreen() {
           key: "perm-status",
           title: "위치 권한 상태",
           value: permissionLabel(permStatus),
+          valueColor: permColor,
+          onPress: permRowOnPress,
         },
         {
           key: "open-system-settings",
@@ -235,7 +279,7 @@ export default function SettingsScreen() {
       data: [
         {
           key: "version",
-          title: "앱 버전",
+          title: "버전 정보",
           value: appVersion,
         },
         {
@@ -306,11 +350,18 @@ export default function SettingsScreen() {
               >
                 {item.title}
               </Text>
-              {item.value !== undefined ? (
-                <Text style={styles.rowValue}>{item.value}</Text>
-              ) : isAction ? (
-                <Text style={styles.chevron}>›</Text>
-              ) : null}
+              {item.value !== undefined && (
+                <Text
+                  style={[
+                    styles.rowValue,
+                    item.valueColor && { color: item.valueColor, fontWeight: "600" },
+                  ]}
+                >
+                  {item.value}
+                </Text>
+              )}
+              {/* 액션 가능한 행은 항상 chevron 표시 — value 가 있어도 함께 (예: 권한 상태 행) */}
+              {isAction && <Text style={styles.chevron}>›</Text>}
             </Pressable>
           );
         }}
