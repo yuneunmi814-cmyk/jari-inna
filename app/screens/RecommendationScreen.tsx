@@ -69,7 +69,7 @@ type NavProp = NativeStackNavigationProp<RootStackParamList, "Recommendation">;
 
 export default function RecommendationScreen() {
   const navigation = useNavigation<NavProp>();
-  const { station, departureLine, destination, destinationLine, direction, resetTrip } = useStation();
+  const { station, departureLine, destination, destinationLine, direction } = useStation();
   const { addFavorite, isFavorite } = useFavorites();
 
   // ─────────────────────────────────────────────────────────────
@@ -164,9 +164,9 @@ export default function RecommendationScreen() {
     return dirResult.direction === "up" ? 1 : 2;
   }, [dirResult]);
 
-  /** 다시 고를래요 — 도착역/방면 모두 초기화 + 홈으로 돌아가기 */
-  const handleResetTrip = () => {
-    resetTrip();
+  /** 뒤로 — state 보존 (도착역/방면 그대로). 시스템 뒤로 제스처와 동작 일치.
+   *  도착역 클리어는 B0 의 DestinationSelector ✕ 버튼으로 가능. */
+  const handleBack = () => {
     navigation.goBack();
   };
 
@@ -303,14 +303,14 @@ export default function RecommendationScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      {/* 헤더 — 좌측 "다시 고를래요"는 resetTrip + 홈으로 */}
+      {/* 헤더 — 좌측 "← 뒤로" (state 보존, 시스템 뒤로 제스처와 동작 일치) */}
       <View style={styles.header}>
         <Pressable
-          onPress={handleResetTrip}
+          onPress={handleBack}
           hitSlop={8}
           style={({ pressed }) => [styles.resetBtn, pressed && { opacity: 0.5 }]}
         >
-          <Text style={styles.resetText}>← 다시 고를래요</Text>
+          <Text style={styles.resetText}>← 뒤로</Text>
         </Pressable>
         <View style={styles.headerCenter}>
           {/* 호선 뱃지 — 출발/도착 호선 같으면 1개, 다르면 환승 경로 2개 */}
