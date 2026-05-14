@@ -93,6 +93,11 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
       : colors.textSecondary,
   };
 
+  // 4중 안전망: Chip key 외에 자식 View/Text 에도 stateKey 부여
+  // 이론상 Chip 의 key prop 변경 시 자식 전체가 unmount 되지만, RN newArch 의
+  // 재조정 단계에서 자식이 cached subtree 로 처리되는 케이스 방어.
+  const stateKey = `${active}-${disabled}`;
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -100,11 +105,13 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
       activeOpacity={0.7}
       style={{ flex: 1 }}
     >
-      <View style={chipStyle}>
-        <Text style={labelStyle} numberOfLines={1}>
+      <View key={`box-${stateKey}`} style={chipStyle}>
+        <Text key={`label-${stateKey}`} style={labelStyle} numberOfLines={1}>
           {label}
         </Text>
-        <Text style={hintStyle}>{hint}</Text>
+        <Text key={`hint-${stateKey}`} style={hintStyle}>
+          {hint}
+        </Text>
       </View>
     </TouchableOpacity>
   );
