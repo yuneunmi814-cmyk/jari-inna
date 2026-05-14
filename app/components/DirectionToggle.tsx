@@ -2,28 +2,26 @@
 //
 // 호선별 라벨:
 //   - 4호선: 당고개행 (상행) / 오이도행 (하행)
-//   - 1호선: 서울역행 (상행) / 동묘앞행 (하행)
-//   - 2호선: 내선순환 (내선) / 외선순환 (외선) — 순환선이라 "행" 없음
-//   - 3호선: 대화행 / 오금행
-//   - 5호선: 방화행 / 하남검단산행
-//   - 6호선: 응암행 / 봉화산행
-//   - 7호선: 장암행 / 석남행
-//   - 8호선: 별내행 / 모란행
-//   - 9호선: 개화행 / 중앙보훈병원행
+//   - 2호선: 내선순환 / 외선순환
+//   - 나머지: 종착역행
 //
-// ⚠️ v1.0 stale 시각 상태 fix 시도 이력:
-//   v6: inline 스타일 — 실패
-//   v7: View 래핑 + key remount + 완전 inline — 실패
-//   v8: Pressable → TouchableOpacity 전면 교체 (이 파일)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// v9 — 진짜 원인 후보 fix:
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 증상: chip 배경/테두리는 inactive 로 갱신되는데 텍스트 색만 active(오렌지)로 잔존.
+// 같은 컴포넌트 같은 boolean 분기에서 일부만 stale 하는 게 부자연스러움 → RN 캐시
+// 버그 가정의 한계 도달.
 //
-// v8 가설:
-// RN Pressable 의 newArchEnabled 환경 렌더링 글리치가 원인일 가능성.
-// TouchableOpacity 는 다른 native impl (RCTTouchableOpacity) 를 사용하므로
-// Pressable 특유의 children 처리 버그를 피할 수 있을지 검증.
+// 새 가설: Android Text 노드의 **selection/highlight 잔존**
+//   - TouchableOpacity onPress 직후 Android 가 자식 Text 에 시스템 accent 색
+//     기반 highlight 를 적용한 채로 잔존
+//   - One UI 의 시스템 accent 가 오렌지 톤이면 텍스트가 오렌지로 보임
+//   - 차단: selectionColor="transparent" + suppressHighlighting={true}
 //
-// 손실:
-//   - android_ripple 효과 사라짐 (TouchableOpacity 는 미지원)
-//   → activeOpacity 로 시각 피드백 대체
+// 보조 fix:
+//   - active/inactive Text 를 conditional rendering 으로 트리 완전 분리
+//     → 같은 인스턴스 재사용 0% → cache 회피
+//   - fontFamily 명시 ("System") → default 폴백 차단
 
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
@@ -31,17 +29,12 @@ import { getReachableTermini } from "../constants/line4Stations";
 import { LINES, type LineKey } from "../constants/lines";
 import { colors } from "../theme/colors";
 import { radius, spacing } from "../theme/spacing";
-import { typography } from "../theme/typography";
 import type { Direction } from "../utils/directionCalculator";
 
 interface Props {
-  /** 출발역 — 갈 수 있는 방면 결정용 */
   fromStation: string;
-  /** 출발 호선 — 라벨/종착역 결정 (LINES dict) */
   lineCode: LineKey;
-  /** 현재 선택된 방면 (null이면 미선택) */
   selected: Direction | null;
-  /** 토글 콜백. 같은 걸 다시 누르면 null 전달 */
   onChange: (d: Direction | null) => void;
 }
 
@@ -53,9 +46,19 @@ interface ChipProps {
   onPress: () => void;
 }
 
+// ── 색상 상수 (inline 으로 직접 박아 의존성 0) ────────────────────
+const ORANGE = "#FF6600";
+const BLACK = "#1A1A1A";
+const GRAY = "#666666";
+const GRAY_LIGHT = "#999999";
+const WHITE = "#FFFFFF";
+const ORANGE_BG = "#FF66001A";
+const BORDER = "#D0D5DD";
+
 function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
   const isActive = !!active && !disabled;
 
+  // chip 박스 스타일 — 매 렌더 새 객체
   const chipStyle = {
     flex: 1,
     borderRadius: radius.md,
@@ -64,39 +67,23 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
     alignItems: "center" as const,
     justifyContent: "center" as const,
     borderWidth: 1.5,
-    backgroundColor: isActive ? colors.accent + "1A" : colors.surface,
-    borderColor: isActive ? colors.accent : colors.border,
+    backgroundColor: isActive ? ORANGE_BG : WHITE,
+    borderColor: isActive ? ORANGE : BORDER,
     opacity: disabled ? 0.35 : 1,
   };
 
-  const labelStyle = {
-    fontSize: typography.bodyLg.fontSize,
-    lineHeight: typography.bodyLg.lineHeight,
-    color: disabled
-      ? colors.textTertiary
-      : isActive
-      ? colors.accent
-      : colors.textPrimary,
-    fontWeight: (isActive ? "600" : "500") as "500" | "600",
-  };
-
-  const hintStyle = {
-    fontSize: typography.micro.fontSize,
-    lineHeight: typography.micro.lineHeight,
-    letterSpacing: typography.micro.letterSpacing,
-    marginTop: 2,
-    fontWeight: "500" as const,
-    color: disabled
-      ? colors.textTertiary
-      : isActive
-      ? colors.accent
-      : colors.textSecondary,
-  };
-
-  // 4중 안전망: Chip key 외에 자식 View/Text 에도 stateKey 부여
-  // 이론상 Chip 의 key prop 변경 시 자식 전체가 unmount 되지만, RN newArch 의
-  // 재조정 단계에서 자식이 cached subtree 로 처리되는 케이스 방어.
-  const stateKey = `${active}-${disabled}`;
+  // 1회 진단 로그 — 6/1 이후 빌드 시 실기기에서 active prop 실제 값과
+  // 적용된 색을 콘솔에서 확인. v9 fix 효과 없을 시 진짜 원인 데이터 확보용.
+  if (__DEV__) {
+    // production 빌드에선 자동 제거 (__DEV__ = false)
+    // eslint-disable-next-line no-console
+    console.log(`[DirectionToggle.Chip] ${label}`, {
+      active,
+      disabled,
+      isActive,
+      labelExpectedColor: disabled ? GRAY_LIGHT : isActive ? ORANGE : BLACK,
+    });
+  }
 
   return (
     <TouchableOpacity
@@ -105,24 +92,93 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
       activeOpacity={0.7}
       style={{ flex: 1 }}
     >
-      <View key={`box-${stateKey}`} style={chipStyle}>
-        <Text key={`label-${stateKey}`} style={labelStyle} numberOfLines={1}>
-          {label}
-        </Text>
-        <Text key={`hint-${stateKey}`} style={hintStyle}>
-          {hint}
-        </Text>
+      <View style={chipStyle}>
+        {/*
+          ✨ active / inactive 텍스트를 conditional rendering 으로 완전 분리.
+             같은 Text 인스턴스 재사용 0% → React 가 다른 컴포넌트로 인식 →
+             native 노드 자체가 unmount/remount → highlight/selection 잔존 불가.
+
+          ✨ selectionColor="transparent" + suppressHighlighting → Android Text
+             노드의 시스템 highlight 색 잔존 차단 (One UI 시스템 accent 가 오렌지
+             톤일 경우의 가설).
+
+          ✨ fontFamily="System" → RN default 폰트 명시 (간헐적 fallback 폰트의
+             color override 차단).
+        */}
+        {isActive ? (
+          <>
+            <Text
+              style={{
+                fontFamily: "System",
+                fontSize: 16,
+                lineHeight: 24,
+                fontWeight: "600",
+                color: ORANGE,
+              }}
+              numberOfLines={1}
+              allowFontScaling
+              selectionColor="transparent"
+              suppressHighlighting
+            >
+              {label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "System",
+                fontSize: 11,
+                lineHeight: 14,
+                letterSpacing: 0.8,
+                fontWeight: "500",
+                marginTop: 2,
+                color: ORANGE,
+              }}
+              allowFontScaling
+              selectionColor="transparent"
+              suppressHighlighting
+            >
+              {hint}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text
+              style={{
+                fontFamily: "System",
+                fontSize: 16,
+                lineHeight: 24,
+                fontWeight: "500",
+                color: disabled ? GRAY_LIGHT : BLACK,
+              }}
+              numberOfLines={1}
+              allowFontScaling
+              selectionColor="transparent"
+              suppressHighlighting
+            >
+              {label}
+            </Text>
+            <Text
+              style={{
+                fontFamily: "System",
+                fontSize: 11,
+                lineHeight: 14,
+                letterSpacing: 0.8,
+                fontWeight: "500",
+                marginTop: 2,
+                color: disabled ? GRAY_LIGHT : GRAY,
+              }}
+              allowFontScaling
+              selectionColor="transparent"
+              suppressHighlighting
+            >
+              {hint}
+            </Text>
+          </>
+        )}
       </View>
     </TouchableOpacity>
   );
 }
 
-/**
- * 호선별 reachable 계산
- * - 4호선: 기존 line4Stations getReachableTermini
- * - 2호선: 순환선이라 양쪽 항상 가능
- * - 그 외: 출발역이 종착역과 동일하면 그 방면 disable
- */
 function computeReachable(
   fromStation: string,
   lineCode: LineKey
@@ -151,7 +207,6 @@ export default function DirectionToggle({
   const reachable = computeReachable(fromStation, lineCode);
   const toggle = (d: Direction) => onChange(selected === d ? null : d);
 
-  // 2호선만 순환 라벨 (행 없음), 그 외 호선은 "○○행"
   const isCircle = lineCode === "2";
   const upLabel = isCircle ? meta.upTerminus : `${meta.upTerminus}행`;
   const downLabel = isCircle ? meta.downTerminus : `${meta.downTerminus}행`;
@@ -163,7 +218,6 @@ export default function DirectionToggle({
 
   return (
     <View style={{ flexDirection: "row", gap: spacing.sm }}>
-      {/* key 에 active/disabled/lineCode 인코딩 → 상태 변할 때 강제 unmount/remount */}
       <Chip
         key={`up-${lineCode}-${upActive}-${!reachable.up}`}
         label={upLabel}
