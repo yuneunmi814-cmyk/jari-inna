@@ -10,7 +10,10 @@
 import axios, { AxiosError } from "axios";
 import { Platform } from "react-native";
 
-const RAW = process.env.EXPO_PUBLIC_API_URL ?? "";
+// EAS production 빌드 시 EXPO_PUBLIC_API_URL 인라인이 누락되는 케이스 안전망:
+// 환경변수가 빈 상태로 빌드되면 axios baseURL 이 비어 ERR_NETWORK 발생.
+// Fly.io production URL 을 하드코딩 fallback 으로 두어 dev/prod 모두 동작 보장.
+const RAW = process.env.EXPO_PUBLIC_API_URL ?? "https://seated-yoon.fly.dev";
 
 /**
  * 웹은 같은 머신에서 도니까 IP → localhost 자동 치환.
