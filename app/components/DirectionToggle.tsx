@@ -11,17 +11,16 @@
 //   - 8호선: 별내행 / 모란행
 //   - 9호선: 개화행 / 중앙보훈병원행
 //
-// 데이터 소스: LINES[lineCode] (단일 출처)
-//   - upTerminus/downTerminus → 라벨
-//   - upLabel/downLabel → 보조 안내
-//
-// reachable 처리:
-//   - 4호선: line4Stations 의 getReachableTermini (기존)
-//   - 2호선: 순환선 — 양 방향 항상 가능
-//   - 그 외: 출발역이 종착역이면 그 방면만 disable
+// ⚠️ v1.0 실기기 버그 fix (v6 → v7):
+// RN 0.81 + newArchEnabled 환경에서 Pressable 자식 Text 가 props 변경 후에도
+// 직전 렌더의 색상을 stale 하게 유지하는 글리치가 inline 스타일 만으로는 완전히
+// 해소되지 않았음. 강력한 우회 3가지 동시 적용:
+//   1) Pressable 자식을 View 로 한 번 감싸 스타일 cascade 격리
+//   2) Chip 에 active/disabled 기반 key prop 부여 → 상태 변할 때 강제 unmount/remount
+//   3) StyleSheet.create 의 styleId 참조 완전 제거 — 모든 스타일을 inline 객체로
 
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { getReachableTermini } from "../constants/line4Stations";
 import { LINES, type LineKey } from "../constants/lines";
 import { colors } from "../theme/colors";
@@ -49,66 +48,67 @@ interface ChipProps {
 }
 
 function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
-  // ⚠️ inline 스타일 사용 (StyleSheet.create ID 참조 X)
-  //
-  // 배경: RN 0.81 + newArch 환경에서 Pressable 자식 Text 가 props 변경 시
-  //       StyleSheet 사전 등록된 styleId 참조를 stale 하게 캐시하는 글리치 보고됨.
-  //       증상: chip 은 inactive 스타일(흰 배경)로 갱신됐는데 자식 Text 는
-  //             직전 렌더의 active 스타일(오렌지 텍스트)을 유지.
-  //       v1.0 출시 스크린샷에서 실제 재현 확인됨.
-  //
-  // 해결: 동적으로 바뀌는 color/fontWeight/border 값을 inline 객체로 즉시
-  //       만들어 전달 → StyleSheet ID 캐시 우회.
-  //
-  // 정적 부분(레이아웃, 패딩 등)은 styles.* 그대로 유지.
-  const bgColor = disabled
-    ? colors.surface
-    : active
-    ? colors.accent + "1A"
-    : colors.surface;
-  const borderColor = disabled
-    ? colors.border
-    : active
-    ? colors.accent
-    : colors.border;
-  const opacity = disabled ? 0.35 : 1;
-  const labelColor = disabled
-    ? colors.textTertiary
-    : active
-    ? colors.accent
-    : colors.textPrimary;
-  const labelWeight: "500" | "600" = active && !disabled ? "600" : "500";
-  const hintColor = disabled
-    ? colors.textTertiary
-    : active
-    ? colors.accent
-    : colors.textSecondary;
+  // 모든 색/굵기/투명도를 매 렌더 새 객체로 계산
+  const isActive = !!active && !disabled;
+
+  const chipStyle = {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    borderWidth: 1.5,
+    backgroundColor: isActive ? colors.accent + "1A" : colors.surface,
+    borderColor: isActive ? colors.accent : colors.border,
+    opacity: disabled ? 0.35 : 1,
+  };
+
+  const labelStyle = {
+    fontSize: typography.bodyLg.fontSize,
+    lineHeight: typography.bodyLg.lineHeight,
+    color: disabled
+      ? colors.textTertiary
+      : isActive
+      ? colors.accent
+      : colors.textPrimary,
+    fontWeight: (isActive ? "600" : "500") as "500" | "600",
+  };
+
+  const hintStyle = {
+    fontSize: typography.micro.fontSize,
+    lineHeight: typography.micro.lineHeight,
+    letterSpacing: typography.micro.letterSpacing,
+    marginTop: 2,
+    fontWeight: "500" as const,
+    color: disabled
+      ? colors.textTertiary
+      : isActive
+      ? colors.accent
+      : colors.textSecondary,
+  };
 
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: bgColor, borderColor, opacity },
-        pressed && !disabled && { opacity: 0.85 },
-      ]}
+      style={{ flex: 1 }}
       android_ripple={
         disabled
           ? undefined
           : {
-              color: active ? colors.accent + "40" : colors.surfaceElevated,
+              color: isActive ? colors.accent + "40" : colors.rippleOnSurface,
               borderless: false,
             }
       }
     >
-      <Text
-        style={[styles.label, { color: labelColor, fontWeight: labelWeight }]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      <Text style={[styles.hint, { color: hintColor }]}>{hint}</Text>
+      {/* View 한 번 감싸 Pressable 의 children 처리와 Text 스타일 격리 */}
+      <View style={chipStyle}>
+        <Text style={labelStyle} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={hintStyle}>{hint}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -154,45 +154,29 @@ export default function DirectionToggle({
   const upHint = isCircle ? "내선" : "상행";
   const downHint = isCircle ? "외선" : "하행";
 
+  const upActive = selected === "up" || selected === "inner";
+  const downActive = selected === "down" || selected === "outer";
+
   return (
-    <View style={styles.row}>
+    <View style={{ flexDirection: "row", gap: spacing.sm }}>
+      {/* key 에 active/disabled/lineCode 인코딩 → 상태 변할 때 강제 unmount/remount.
+          이전 렌더의 자식 Text style 상태 일체 캐시 불가. */}
       <Chip
+        key={`up-${lineCode}-${upActive}-${!reachable.up}`}
         label={upLabel}
         hint={upHint}
-        active={selected === "up" || selected === "inner"}
+        active={upActive}
         disabled={!reachable.up}
         onPress={() => toggle(isCircle ? "inner" : "up")}
       />
       <Chip
+        key={`down-${lineCode}-${downActive}-${!reachable.down}`}
         label={downLabel}
         hint={downHint}
-        active={selected === "down" || selected === "outer"}
+        active={downActive}
         disabled={!reachable.down}
         onPress={() => toggle(isCircle ? "outer" : "down")}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  // 정적 레이아웃만 — 동적(active/disabled) 부분은 Chip 안에서 inline 처리
-  chip: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    borderWidth: 1.5,
-  },
-  label: {
-    ...typography.bodyLg,
-  },
-  hint: {
-    ...typography.micro,
-    marginTop: 2,
-  },
-});
