@@ -11,16 +11,22 @@
 //   - 8호선: 별내행 / 모란행
 //   - 9호선: 개화행 / 중앙보훈병원행
 //
-// ⚠️ v1.0 실기기 버그 fix (v6 → v7):
-// RN 0.81 + newArchEnabled 환경에서 Pressable 자식 Text 가 props 변경 후에도
-// 직전 렌더의 색상을 stale 하게 유지하는 글리치가 inline 스타일 만으로는 완전히
-// 해소되지 않았음. 강력한 우회 3가지 동시 적용:
-//   1) Pressable 자식을 View 로 한 번 감싸 스타일 cascade 격리
-//   2) Chip 에 active/disabled 기반 key prop 부여 → 상태 변할 때 강제 unmount/remount
-//   3) StyleSheet.create 의 styleId 참조 완전 제거 — 모든 스타일을 inline 객체로
+// ⚠️ v1.0 stale 시각 상태 fix 시도 이력:
+//   v6: inline 스타일 — 실패
+//   v7: View 래핑 + key remount + 완전 inline — 실패
+//   v8: Pressable → TouchableOpacity 전면 교체 (이 파일)
+//
+// v8 가설:
+// RN Pressable 의 newArchEnabled 환경 렌더링 글리치가 원인일 가능성.
+// TouchableOpacity 는 다른 native impl (RCTTouchableOpacity) 를 사용하므로
+// Pressable 특유의 children 처리 버그를 피할 수 있을지 검증.
+//
+// 손실:
+//   - android_ripple 효과 사라짐 (TouchableOpacity 는 미지원)
+//   → activeOpacity 로 시각 피드백 대체
 
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { getReachableTermini } from "../constants/line4Stations";
 import { LINES, type LineKey } from "../constants/lines";
 import { colors } from "../theme/colors";
@@ -48,7 +54,6 @@ interface ChipProps {
 }
 
 function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
-  // 모든 색/굵기/투명도를 매 렌더 새 객체로 계산
   const isActive = !!active && !disabled;
 
   const chipStyle = {
@@ -89,27 +94,19 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
   };
 
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
+      activeOpacity={0.7}
       style={{ flex: 1 }}
-      android_ripple={
-        disabled
-          ? undefined
-          : {
-              color: isActive ? colors.accent + "40" : colors.rippleOnSurface,
-              borderless: false,
-            }
-      }
     >
-      {/* View 한 번 감싸 Pressable 의 children 처리와 Text 스타일 격리 */}
       <View style={chipStyle}>
         <Text style={labelStyle} numberOfLines={1}>
           {label}
         </Text>
         <Text style={hintStyle}>{hint}</Text>
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
@@ -159,8 +156,7 @@ export default function DirectionToggle({
 
   return (
     <View style={{ flexDirection: "row", gap: spacing.sm }}>
-      {/* key 에 active/disabled/lineCode 인코딩 → 상태 변할 때 강제 unmount/remount.
-          이전 렌더의 자식 Text style 상태 일체 캐시 불가. */}
+      {/* key 에 active/disabled/lineCode 인코딩 → 상태 변할 때 강제 unmount/remount */}
       <Chip
         key={`up-${lineCode}-${upActive}-${!reachable.up}`}
         label={upLabel}
