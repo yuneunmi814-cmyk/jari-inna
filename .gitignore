@@ -43,3 +43,12 @@ web-build/
 
 # 출시 스크린샷 원본 (카톡 큰 파일)
 docs/screenshots/raw/
+
+# === 시티드 v1.0 로컬 빌드 보안 (2026-05) ===
+# Android keystore + EAS credentials JSON (비밀번호 평문 포함)
+# 절대 커밋 금지 — 유출 시 앱 위변조 가능
+credentials.json
+**/credentials.json
+credentials/
+**/keystores/
+*.keystore
