@@ -136,6 +136,10 @@ export function StationProvider({ children }: { children: React.ReactNode }) {
   const setDepartureLine = (ln: LineKey) => {
     console.log("[StationContext] setDepartureLine:", ln);
     setDepartureLineState(ln);
+    // 호선 변경 시 direction 리셋 — 호선별 방면 의미가 달라서 stale state 위험.
+    // 예) 4호선 "down"(오이도행) 선택 후 2호선으로 바꾸면 "down"이 DirectionToggle
+    // 에서 "외선"으로 매핑돼 의도치 않은 chip 활성화.
+    setDirectionState(null);
     AsyncStorage.setItem(STORAGE_DEP_LINE, ln).catch(() => {});
   };
 

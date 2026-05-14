@@ -49,23 +49,40 @@ interface ChipProps {
 }
 
 function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
-  const chipStateStyle = disabled
-    ? styles.chipDisabled
+  // ⚠️ inline 스타일 사용 (StyleSheet.create ID 참조 X)
+  //
+  // 배경: RN 0.81 + newArch 환경에서 Pressable 자식 Text 가 props 변경 시
+  //       StyleSheet 사전 등록된 styleId 참조를 stale 하게 캐시하는 글리치 보고됨.
+  //       증상: chip 은 inactive 스타일(흰 배경)로 갱신됐는데 자식 Text 는
+  //             직전 렌더의 active 스타일(오렌지 텍스트)을 유지.
+  //       v1.0 출시 스크린샷에서 실제 재현 확인됨.
+  //
+  // 해결: 동적으로 바뀌는 color/fontWeight/border 값을 inline 객체로 즉시
+  //       만들어 전달 → StyleSheet ID 캐시 우회.
+  //
+  // 정적 부분(레이아웃, 패딩 등)은 styles.* 그대로 유지.
+  const bgColor = disabled
+    ? colors.surface
     : active
-    ? styles.chipActive
-    : styles.chipInactive;
-
-  const labelStateStyle = disabled
-    ? styles.labelDisabled
+    ? colors.accent + "1A"
+    : colors.surface;
+  const borderColor = disabled
+    ? colors.border
     : active
-    ? styles.labelActive
-    : styles.labelInactive;
-
-  const hintStateStyle = disabled
-    ? styles.hintDisabled
+    ? colors.accent
+    : colors.border;
+  const opacity = disabled ? 0.35 : 1;
+  const labelColor = disabled
+    ? colors.textTertiary
     : active
-    ? styles.hintActive
-    : styles.hintInactive;
+    ? colors.accent
+    : colors.textPrimary;
+  const labelWeight: "500" | "600" = active && !disabled ? "600" : "500";
+  const hintColor = disabled
+    ? colors.textTertiary
+    : active
+    ? colors.accent
+    : colors.textSecondary;
 
   return (
     <Pressable
@@ -73,7 +90,7 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
       disabled={disabled}
       style={({ pressed }) => [
         styles.chip,
-        chipStateStyle,
+        { backgroundColor: bgColor, borderColor, opacity },
         pressed && !disabled && { opacity: 0.85 },
       ]}
       android_ripple={
@@ -85,10 +102,13 @@ function Chip({ label, hint, active, disabled, onPress }: ChipProps) {
             }
       }
     >
-      <Text style={[styles.label, labelStateStyle]} numberOfLines={1}>
+      <Text
+        style={[styles.label, { color: labelColor, fontWeight: labelWeight }]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
-      <Text style={[styles.hint, hintStateStyle]}>{hint}</Text>
+      <Text style={[styles.hint, { color: hintColor }]}>{hint}</Text>
     </Pressable>
   );
 }
@@ -159,6 +179,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
   },
+  // 정적 레이아웃만 — 동적(active/disabled) 부분은 Chip 안에서 inline 처리
   chip: {
     flex: 1,
     borderRadius: radius.md,
@@ -167,39 +188,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
   },
-  chipActive: {
-    backgroundColor: colors.accent + "1A",
-    borderColor: colors.accent,
-  },
-  chipInactive: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-  },
-  chipDisabled: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    opacity: 0.35,
-  },
   label: {
     ...typography.bodyLg,
-  },
-  labelActive: {
-    color: colors.accent,
-    fontWeight: "600",
-  },
-  labelInactive: {
-    color: colors.textPrimary,
-    fontWeight: "500",
-  },
-  labelDisabled: {
-    color: colors.textTertiary,
-    fontWeight: "500",
   },
   hint: {
     ...typography.micro,
     marginTop: 2,
   },
-  hintActive: { color: colors.accent },
-  hintInactive: { color: colors.textSecondary },
-  hintDisabled: { color: colors.textTertiary },
 });
